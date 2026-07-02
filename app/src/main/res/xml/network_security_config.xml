@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    v0.1 安全策略：HTTPS 默认严格校验系统信任锚，不放宽证书校验。
+    HTTP 实例允许用户主动添加（应用层提示风险），故未使用 cleartextTrafficPermitted="false" 全局禁用，
+    交由 core/network 层按实例 baseUrl scheme 处理提示逻辑；系统信任锚保持默认，不新增自定义 CA。
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

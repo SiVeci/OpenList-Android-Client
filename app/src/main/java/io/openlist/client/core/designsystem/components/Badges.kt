@@ -1,0 +1,45 @@
+package io.openlist.client.core.designsystem.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import io.openlist.client.core.designsystem.OpenListTheme
+import io.openlist.client.core.designsystem.PillShape
+import io.openlist.client.core.designsystem.Spacing
+
+enum class StatusTone { NEUTRAL, SUCCESS, WARNING, ERROR, PRIMARY }
+
+@Composable
+fun StatusBadge(
+    text: String,
+    modifier: Modifier = Modifier,
+    tone: StatusTone = StatusTone.NEUTRAL,
+) {
+    val (background, content) = badgeColors(tone)
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = content,
+        modifier = modifier
+            .background(background, PillShape)
+            .padding(horizontal = Spacing.xs, vertical = Spacing.xxs),
+    )
+}
+
+@Composable
+private fun badgeColors(tone: StatusTone): Pair<Color, Color> {
+    val extended = OpenListTheme.extendedColors
+    val scheme = MaterialTheme.colorScheme
+    return when (tone) {
+        StatusTone.NEUTRAL -> scheme.surfaceVariant to scheme.onSurfaceVariant
+        StatusTone.SUCCESS -> extended.success.copy(alpha = 0.14f) to extended.success
+        StatusTone.WARNING -> extended.warning.copy(alpha = 0.14f) to extended.warning
+        StatusTone.ERROR -> scheme.error.copy(alpha = 0.14f) to scheme.error
+        StatusTone.PRIMARY -> scheme.primary to scheme.onPrimary
+    }
+}
