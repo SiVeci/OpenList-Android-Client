@@ -5,7 +5,7 @@ import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import io.openlist.client.core.auth.SessionTokenProvider
-import io.openlist.client.core.network.TokenProvider
+import io.openlist.client.core.auth.TokenProvider
 import javax.inject.Singleton
 
 @Module

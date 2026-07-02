@@ -25,10 +25,9 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): OpenListDatabase =
         Room.databaseBuilder(context, OpenListDatabase::class.java, "openlist.db")
-            // Pre-release only: no shipped v0.1 build has real user data yet, so
-            // schema bumps recreate tables instead of requiring hand-written
-            // Migrations. Replace with real Migrations once v0.1 ships.
-            .fallbackToDestructiveMigration()
+            // v0.1.0 has shipped with real user data, so schema bumps from here on
+            // require hand-written Migrations (registered here as they're added,
+            // starting with MIGRATION_4_5 in v0.2) instead of a destructive fallback.
             .build()
 
     @Provides

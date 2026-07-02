@@ -33,7 +33,7 @@ android {
         minSdk = 29
         targetSdk = 35
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = libs.versions.appVersionName.get()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -87,6 +87,20 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:common"))
+    implementation(project(":core:model"))
+    implementation(project(":core:designsystem"))
+    implementation(project(":core:network"))
+    implementation(project(":core:database"))
+    implementation(project(":core:auth"))
+    implementation(project(":core:domain"))
+    implementation(project(":data:repository"))
+    implementation(project(":feature:instance"))
+    implementation(project(":feature:auth"))
+    implementation(project(":feature:files"))
+    implementation(project(":feature:settings"))
+    implementation(project(":feature:upload"))
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -109,14 +123,6 @@ dependencies {
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
-    ksp(libs.androidx.room.compiler)
-
-    implementation(libs.androidx.datastore.preferences)
-
-    implementation(libs.squareup.retrofit)
-    implementation(libs.squareup.retrofit.kotlinx.serialization.converter)
-    implementation(libs.squareup.okhttp)
-    implementation(libs.squareup.okhttp.logging.interceptor)
 
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
@@ -128,8 +134,4 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
-}
-
-ksp {
-    arg("room.schemaLocation", "$projectDir/schemas")
 }
