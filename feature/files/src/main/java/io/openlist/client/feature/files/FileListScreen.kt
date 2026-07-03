@@ -9,23 +9,44 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.CreateNewFolder
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DriveFileRenameOutline
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import io.openlist.client.core.designsystem.Spacing
 import io.openlist.client.core.designsystem.components.AppTopBar
 import io.openlist.client.core.designsystem.components.Breadcrumb
+import io.openlist.client.core.designsystem.components.ConfirmDialog
 import io.openlist.client.core.designsystem.components.EmptyState
 import io.openlist.client.core.designsystem.components.ErrorBar
+import io.openlist.client.core.designsystem.components.FileActionItem
+import io.openlist.client.core.designsystem.components.FileActionSheet
 import io.openlist.client.core.designsystem.components.ListRowItem
 import io.openlist.client.core.designsystem.components.LoadingState
+import io.openlist.client.core.designsystem.components.TextInputDialog
+import io.openlist.client.core.model.FileNode
 import io.openlist.client.core.network.OpenListPathCodec
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -41,21 +62,41 @@ fun FileListScreen(
     viewModel: FileListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val clipboardManager = LocalClipboardManager.current
+    val snackbarHostState = remember { SnackbarHostState() }
 
     BackHandler(enabled = uiState.currentPath != "/") {
         viewModel.navigateToParent()
     }
 
+    LaunchedEffect(uiState.snackbarMessage) {
+        uiState.snackbarMessage?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            viewModel.dismissSnackbar()
+        }
+    }
+
     Scaffold(
         topBar = {
             Column {
-                AppTopBar(title = uiState.instanceName, onBack = onBackToInstances)
+                AppTopBar(
+                    title = uiState.instanceName,
+                    onBack = onBackToInstances,
+                    actions = {
+                        if (uiState.canWrite) {
+                            IconButton(onClick = { viewModel.openNewFolderDialog() }) {
+                                Icon(Icons.Filled.CreateNewFolder, contentDescription = "新建目录")
+                            }
+                        }
+                    },
+                )
                 Breadcrumb(
                     segments = listOf("根目录") + OpenListPathCodec.segments(uiState.currentPath),
                     onSegmentClick = { index -> viewModel.navigateToSegmentCount(index) },
                 )
             }
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
             if (uiState.fromCache) {
@@ -93,6 +134,11 @@ fun FileListScreen(
                                 onClick = {
                                     if (node.isDir) viewModel.navigateTo(node.path) else onOpenFileDetail(node.path)
                                 },
+                                trailing = {
+                                    IconButton(onClick = { viewModel.openActionSheet(node) }) {
+                                        Icon(Icons.Filled.MoreVert, contentDescription = "更多")
+                                    }
+                                },
                             )
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         }
@@ -100,6 +146,87 @@ fun FileListScreen(
                 }
             }
         }
+    }
+
+    uiState.actionSheetTarget?.let { node ->
+        FileActionSheet(
+            actions = buildFileActions(
+                node = node,
+                canWrite = uiState.canWrite,
+                onOpenDetail = { onOpenFileDetail(node.path) },
+                onRename = { viewModel.openRenameDialog(node) },
+                onDelete = { viewModel.openDeleteConfirm(node) },
+                onCopyPath = { clipboardManager.setText(AnnotatedString(node.path)) },
+                onCopyName = { clipboardManager.setText(AnnotatedString(node.name)) },
+            ),
+            onDismiss = { viewModel.dismissActionSheet() },
+        )
+    }
+
+    when (val dialog = uiState.dialog) {
+        FileListDialog.NewFolder -> TextInputDialog(
+            title = "新建目录",
+            value = uiState.dialogInputValue,
+            onValueChange = viewModel::onDialogValueChange,
+            onConfirm = viewModel::confirmDialog,
+            onDismiss = viewModel::dismissDialog,
+            label = "目录名称",
+            confirmEnabled = uiState.dialogInputValue.isNotBlank(),
+            errorMessage = uiState.dialogError,
+            loading = uiState.dialogLoading,
+        )
+        is FileListDialog.Rename -> TextInputDialog(
+            title = "重命名",
+            value = uiState.dialogInputValue,
+            onValueChange = viewModel::onDialogValueChange,
+            onConfirm = viewModel::confirmDialog,
+            onDismiss = viewModel::dismissDialog,
+            label = "名称",
+            confirmEnabled = uiState.dialogInputValue.isNotBlank(),
+            errorMessage = uiState.dialogError,
+            loading = uiState.dialogLoading,
+        )
+        is FileListDialog.DeleteConfirm -> ConfirmDialog(
+            title = "删除",
+            message = if (dialog.node.isDir) {
+                "确定删除目录「${dialog.node.name}」及其内容吗？此操作可能无法撤销。"
+            } else {
+                "确定删除「${dialog.node.name}」吗？此操作可能无法撤销。"
+            },
+            onConfirm = viewModel::confirmDialog,
+            onDismiss = viewModel::dismissDialog,
+            confirmText = "删除",
+            danger = true,
+            loading = uiState.dialogLoading,
+            errorMessage = uiState.dialogError,
+        )
+        null -> Unit
+    }
+}
+
+/** "下载" and "详情" both route to the file detail screen (v0.1's existing
+ * download button lives there) rather than duplicating the download call
+ * here — v0.1_EXECUTION_PLAN.md's download flow is reused as-is, not re-wired. */
+private fun buildFileActions(
+    node: FileNode,
+    canWrite: Boolean,
+    onOpenDetail: () -> Unit,
+    onRename: () -> Unit,
+    onDelete: () -> Unit,
+    onCopyPath: () -> Unit,
+    onCopyName: () -> Unit,
+): List<FileActionItem> = buildList {
+    if (!node.isDir) {
+        add(FileActionItem(label = "下载", icon = Icons.Outlined.Download, onClick = onOpenDetail))
+    }
+    add(FileActionItem(label = "详情", icon = Icons.Filled.Info, onClick = onOpenDetail))
+    if (canWrite) {
+        add(FileActionItem(label = "重命名", icon = Icons.Filled.DriveFileRenameOutline, onClick = onRename))
+    }
+    add(FileActionItem(label = "复制路径", icon = Icons.Filled.ContentCopy, onClick = onCopyPath))
+    add(FileActionItem(label = "复制名称", icon = Icons.Filled.ContentCopy, onClick = onCopyName))
+    if (canWrite) {
+        add(FileActionItem(label = "删除", icon = Icons.Filled.Delete, onClick = onDelete, danger = true))
     }
 }
 
