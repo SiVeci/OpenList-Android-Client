@@ -16,3 +16,29 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         db.execSQL("ALTER TABLE sessions ADD COLUMN permission INTEGER NOT NULL DEFAULT 0")
     }
 }
+
+/** Adds `upload_tasks` (Sprint 6). Column order/types mirror UploadTaskEntity
+ * exactly — cross-checked against Room's own generated createSql for the
+ * other task tables in the exported schema JSON files, rather than guessed. */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `upload_tasks` (" +
+                "`id` TEXT NOT NULL, " +
+                "`instanceId` TEXT NOT NULL, " +
+                "`targetDir` TEXT NOT NULL, " +
+                "`localUri` TEXT NOT NULL, " +
+                "`fileName` TEXT NOT NULL, " +
+                "`mimeType` TEXT, " +
+                "`totalBytes` INTEGER, " +
+                "`uploadedBytes` INTEGER NOT NULL, " +
+                "`status` TEXT NOT NULL, " +
+                "`errorMessage` TEXT, " +
+                "`workRequestId` TEXT, " +
+                "`overwrite` INTEGER NOT NULL, " +
+                "`createdAt` INTEGER NOT NULL, " +
+                "`updatedAt` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`id`))",
+        )
+    }
+}

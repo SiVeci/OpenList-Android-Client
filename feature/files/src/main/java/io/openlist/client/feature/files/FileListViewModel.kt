@@ -1,5 +1,6 @@
 package io.openlist.client.feature.files
 
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -15,8 +16,11 @@ import io.openlist.client.core.domain.FileListResult
 import io.openlist.client.core.domain.FileOperationRepository
 import io.openlist.client.core.domain.FilesRepository
 import io.openlist.client.core.domain.InstanceRepository
+import io.openlist.client.core.domain.UploadRepository
 import io.openlist.client.core.model.BatchOperationFailure
 import io.openlist.client.core.model.FileNode
+import io.openlist.client.core.model.UploadStatus
+import io.openlist.client.core.model.UploadTask
 import io.openlist.client.core.network.OpenListPathCodec
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -82,8 +86,11 @@ data class FileListUiState(
     val failureDetails: List<BatchOperationFailure>? = null,
     val selectionMode: Boolean = false,
     val selectedPaths: Set<String> = emptySet(),
+    val uploadTasks: List<UploadTask> = emptyList(),
+    val showUploadPanel: Boolean = false,
 ) {
     val allSelected: Boolean get() = nodes.isNotEmpty() && selectedPaths.size == nodes.size
+    val hasActiveUploads: Boolean get() = uploadTasks.any { it.status == UploadStatus.PENDING || it.status == UploadStatus.RUNNING }
 }
 
 @HiltViewModel
@@ -94,6 +101,7 @@ class FileListViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val fileOperationRepository: FileOperationRepository,
     private val directoryPickerRepository: DirectoryPickerRepository,
+    private val uploadRepository: UploadRepository,
 ) : ViewModel() {
 
     private val instanceId: String = checkNotNull(savedStateHandle["instanceId"])
@@ -108,6 +116,9 @@ class FileListViewModel @Inject constructor(
         }
         authRepository.observeSession(instanceId)
             .onEach { session -> _uiState.update { it.copy(canWrite = session != null && !session.isGuest) } }
+            .launchIn(viewModelScope)
+        uploadRepository.observeUploadTasks(instanceId)
+            .onEach { tasks -> onUploadTasksChanged(tasks) }
             .launchIn(viewModelScope)
         val startPath = savedStateHandle.get<String>("path")
             ?.let { runCatching { URLDecoder.decode(it, "UTF-8") }.getOrNull() }
@@ -458,5 +469,49 @@ class FileListViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    // --- Upload --------------------------------------------------------------
+
+    /** [uris] are `ACTION_OPEN_DOCUMENT` results the Screen already resolved
+     * via its picker launcher; persisting read access happens inside the
+     * repository, before the Worker that needs it is ever enqueued (P6). */
+    fun enqueueUpload(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        viewModelScope.launch {
+            when (val result = uploadRepository.enqueueUpload(instanceId, _uiState.value.currentPath, uris)) {
+                is ApiResult.Success -> _uiState.update { it.copy(showUploadPanel = true) }
+                is ApiResult.Failure -> _uiState.update {
+                    it.copy(snackbarMessage = result.error.toUserMessage(), snackbarIsError = true)
+                }
+            }
+        }
+    }
+
+    fun openUploadPanel() {
+        _uiState.update { it.copy(showUploadPanel = true) }
+    }
+
+    fun dismissUploadPanel() {
+        _uiState.update { it.copy(showUploadPanel = false) }
+    }
+
+    fun cancelUpload(taskId: String) {
+        viewModelScope.launch { uploadRepository.cancelUpload(taskId) }
+    }
+
+    /** Auto-refreshes the file list when an upload targeting the directory
+     * the user is currently looking at just finished (v0.2_EXECUTION_PLAN.md
+     * §13.5/§18) — not on every emission, only on a PENDING/RUNNING → SUCCESS
+     * transition, so this doesn't refetch on every progress tick. */
+    private fun onUploadTasksChanged(tasks: List<UploadTask>) {
+        val previousById = _uiState.value.uploadTasks.associateBy { it.id }
+        _uiState.update { it.copy(uploadTasks = tasks) }
+        val justSucceededHere = tasks.any { task ->
+            task.status == UploadStatus.SUCCESS &&
+                task.targetDir == _uiState.value.currentPath &&
+                previousById[task.id]?.status != UploadStatus.SUCCESS
+        }
+        if (justSucceededHere) refresh()
     }
 }

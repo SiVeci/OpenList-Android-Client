@@ -8,11 +8,13 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.openlist.client.core.database.MIGRATION_4_5
+import io.openlist.client.core.database.MIGRATION_5_6
 import io.openlist.client.core.database.OpenListDatabase
 import io.openlist.client.core.database.dao.DownloadTaskDao
 import io.openlist.client.core.database.dao.FileCacheDao
 import io.openlist.client.core.database.dao.InstanceDao
 import io.openlist.client.core.database.dao.SessionDao
+import io.openlist.client.core.database.dao.UploadTaskDao
 import javax.inject.Singleton
 
 // AppPreferences is provided via its @Inject constructor (@ApplicationContext),
@@ -28,7 +30,7 @@ object DatabaseModule {
         Room.databaseBuilder(context, OpenListDatabase::class.java, "openlist.db")
             // v0.1.0 has shipped with real user data, so schema bumps from here on
             // require hand-written Migrations instead of a destructive fallback.
-            .addMigrations(MIGRATION_4_5)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
             .build()
 
     @Provides
@@ -42,4 +44,7 @@ object DatabaseModule {
 
     @Provides
     fun provideDownloadTaskDao(database: OpenListDatabase): DownloadTaskDao = database.downloadTaskDao()
+
+    @Provides
+    fun provideUploadTaskDao(database: OpenListDatabase): UploadTaskDao = database.uploadTaskDao()
 }

@@ -1,16 +1,21 @@
 package io.openlist.client.feature.files
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DriveFileMove
+import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
@@ -18,13 +23,17 @@ import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.FileCopy
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Badge
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -55,7 +64,11 @@ import io.openlist.client.core.designsystem.components.FileActionSheet
 import io.openlist.client.core.designsystem.components.ListRowItem
 import io.openlist.client.core.designsystem.components.LoadingState
 import io.openlist.client.core.designsystem.components.TextInputDialog
+import io.openlist.client.core.designsystem.components.UploadItemStatus
+import io.openlist.client.core.designsystem.components.UploadProgressItem
 import io.openlist.client.core.model.FileNode
+import io.openlist.client.core.model.UploadStatus
+import io.openlist.client.core.model.UploadTask
 import io.openlist.client.core.network.OpenListPathCodec
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -74,6 +87,13 @@ fun FileListScreen(
     val clipboardManager = LocalClipboardManager.current
     val snackbarHostState = remember { SnackbarHostState() }
     var showFailureDetails by remember { mutableStateOf(false) }
+
+    // ACTION_OPEN_DOCUMENT (not GET_CONTENT): the resulting URIs support
+    // takePersistableUriPermission, which a WorkManager Worker started well
+    // after this picker closes still needs to be able to read (P6).
+    val uploadPickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris -> viewModel.enqueueUpload(uris) }
 
     BackHandler(enabled = uiState.selectionMode || uiState.currentPath != "/") {
         if (uiState.selectionMode) viewModel.exitSelectionMode() else viewModel.navigateToParent()
@@ -105,7 +125,21 @@ fun FileListScreen(
                         title = uiState.instanceName,
                         onBack = onBackToInstances,
                         actions = {
+                            if (uiState.uploadTasks.isNotEmpty()) {
+                                IconButton(onClick = { viewModel.openUploadPanel() }) {
+                                    if (uiState.hasActiveUploads) {
+                                        BadgedBox(badge = { Badge() }) {
+                                            Icon(Icons.Filled.CloudSync, contentDescription = "上传进度")
+                                        }
+                                    } else {
+                                        Icon(Icons.Filled.CloudSync, contentDescription = "上传进度")
+                                    }
+                                }
+                            }
                             if (uiState.canWrite) {
+                                IconButton(onClick = { uploadPickerLauncher.launch(arrayOf("*/*")) }) {
+                                    Icon(Icons.Filled.UploadFile, contentDescription = "上传")
+                                }
                                 IconButton(onClick = { viewModel.openNewFolderDialog() }) {
                                     Icon(Icons.Filled.CreateNewFolder, contentDescription = "新建目录")
                                 }
@@ -206,6 +240,14 @@ fun FileListScreen(
             onRefresh = { viewModel.directoryPickerRefresh() },
             onDismiss = { viewModel.dismissDirectoryPicker() },
             selecting = picker.isSubmitting,
+        )
+    }
+
+    if (uiState.showUploadPanel) {
+        UploadPanelSheet(
+            tasks = uiState.uploadTasks,
+            onCancel = { taskId -> viewModel.cancelUpload(taskId) },
+            onDismiss = { viewModel.dismissUploadPanel() },
         )
     }
 
@@ -310,6 +352,47 @@ private fun buildFileActions(
     if (canWrite) {
         add(FileActionItem(label = "删除", icon = Icons.Filled.Delete, onClick = onDelete, danger = true))
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun UploadPanelSheet(
+    tasks: List<UploadTask>,
+    onCancel: (taskId: String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Text(
+            "上传",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        )
+        LazyColumn(modifier = Modifier.fillMaxWidth()) {
+            items(tasks, key = { it.id }) { task ->
+                UploadProgressItem(
+                    fileName = task.fileName,
+                    sizeText = task.totalBytes?.let(::formatSize) ?: "大小未知",
+                    status = task.status.toUiStatus(),
+                    progress = task.totalBytes?.takeIf { it > 0 }?.let { total -> task.uploadedBytes.toFloat() / total },
+                    errorMessage = task.errorMessage,
+                    onCancel = if (task.status == UploadStatus.PENDING || task.status == UploadStatus.RUNNING) {
+                        { onCancel(task.id) }
+                    } else {
+                        null
+                    },
+                )
+            }
+        }
+        Spacer(Modifier.navigationBarsPadding())
+    }
+}
+
+private fun UploadStatus.toUiStatus(): UploadItemStatus = when (this) {
+    UploadStatus.PENDING -> UploadItemStatus.PENDING
+    UploadStatus.RUNNING -> UploadItemStatus.RUNNING
+    UploadStatus.SUCCESS -> UploadItemStatus.SUCCESS
+    UploadStatus.FAILED -> UploadItemStatus.FAILED
+    UploadStatus.CANCELLED -> UploadItemStatus.CANCELLED
 }
 
 private fun formatSize(bytes: Long): String {

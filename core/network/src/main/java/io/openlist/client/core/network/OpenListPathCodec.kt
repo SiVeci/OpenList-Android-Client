@@ -73,4 +73,21 @@ object OpenListPathCodec {
         if (sign.isNotEmpty()) builder.addQueryParameter("sign", sign)
         return builder.build().toString()
     }
+
+    /**
+     * Percent-encodes [path] for the upload `File-Path` header, which the
+     * server unescapes with Go's `url.PathUnescape` (v0.2_EXECUTION_PLAN.md
+     * §10.3/§14.3) — that only unescapes `%XX` sequences, it does not treat
+     * `/` specially, so a blanket `URLEncoder.encode` would wrongly turn every
+     * directory separator into `%2F` and break the path. Each segment is
+     * encoded independently (same OkHttp machinery as [buildDownloadUrl]) and
+     * rejoined with literal `/`.
+     */
+    fun encodePathForHeader(path: String): String {
+        val builder = "http://x".toHttpUrlOrNull()!!.newBuilder()
+        for (segment in segments(path)) {
+            builder.addPathSegment(segment)
+        }
+        return builder.build().encodedPath
+    }
 }

@@ -6,6 +6,7 @@ import io.openlist.client.core.database.dao.DownloadTaskDao
 import io.openlist.client.core.database.dao.FileCacheDao
 import io.openlist.client.core.database.dao.InstanceDao
 import io.openlist.client.core.database.dao.SessionDao
+import io.openlist.client.core.database.dao.UploadTaskDao
 import io.openlist.client.core.database.entity.InstanceEntity
 import io.openlist.client.core.domain.InstanceRepository
 import io.openlist.client.core.model.Instance
@@ -24,6 +25,7 @@ class InstanceRepositoryImpl @Inject constructor(
     private val sessionDao: SessionDao,
     private val fileCacheDao: FileCacheDao,
     private val downloadTaskDao: DownloadTaskDao,
+    private val uploadTaskDao: UploadTaskDao,
     private val clientFactory: OpenListClientFactory,
 ) : InstanceRepository {
 
@@ -70,6 +72,11 @@ class InstanceRepositoryImpl @Inject constructor(
         sessionDao.deleteByInstanceId(id)
         fileCacheDao.deleteByInstanceId(id)
         downloadTaskDao.deleteByInstanceId(id)
+        // Matches downloadTaskDao's existing precedent: clears the local record,
+        // does not reach into WorkManager to cancel an in-flight upload — a
+        // deleted instance's worker fails its own instance lookup on its next
+        // step and stops there.
+        uploadTaskDao.deleteByInstanceId(id)
         dao.deleteById(id)
     }
 

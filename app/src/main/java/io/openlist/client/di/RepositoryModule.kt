@@ -10,12 +10,14 @@ import io.openlist.client.core.domain.FileOperationRepository
 import io.openlist.client.core.domain.FilesRepository
 import io.openlist.client.core.domain.InstanceRepository
 import io.openlist.client.core.domain.TransferRepository
+import io.openlist.client.core.domain.UploadRepository
 import io.openlist.client.data.repository.AuthRepositoryImpl
 import io.openlist.client.data.repository.DirectoryPickerRepositoryImpl
 import io.openlist.client.data.repository.FileOperationRepositoryImpl
 import io.openlist.client.data.repository.FilesRepositoryImpl
 import io.openlist.client.data.repository.InstanceRepositoryImpl
 import io.openlist.client.data.repository.TransferRepositoryImpl
+import io.openlist.client.data.repository.UploadRepositoryImpl
 import javax.inject.Singleton
 
 @Module
@@ -44,4 +46,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindDirectoryPickerRepository(impl: DirectoryPickerRepositoryImpl): DirectoryPickerRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindUploadRepository(impl: UploadRepositoryImpl): UploadRepository
 }
