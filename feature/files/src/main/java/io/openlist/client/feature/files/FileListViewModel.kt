@@ -6,7 +6,10 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.openlist.client.core.common.ApiResult
 import io.openlist.client.core.common.toUserMessage
+import io.openlist.client.core.designsystem.components.DirectoryPickerContent
+import io.openlist.client.core.designsystem.components.DirectoryPickerEntry
 import io.openlist.client.core.domain.AuthRepository
+import io.openlist.client.core.domain.DirectoryPickerRepository
 import io.openlist.client.core.domain.FileListResult
 import io.openlist.client.core.domain.FileOperationRepository
 import io.openlist.client.core.domain.FilesRepository
@@ -24,13 +27,27 @@ import java.net.URLDecoder
 import javax.inject.Inject
 
 /** A single file/directory's write-action menu and the mkdir/rename/delete
- * dialogs it opens (v0.2_EXECUTION_PLAN.md §13.3/§13.4/§13.5). Move/copy are
- * deferred to Sprint 4, which adds the target-directory picker they need. */
+ * dialogs it opens (v0.2_EXECUTION_PLAN.md §13.3/§13.4/§13.5). Move/copy go
+ * through [DirectoryPickerUiState] instead, since they need a target directory. */
 sealed class FileListDialog {
     data object NewFolder : FileListDialog()
     data class Rename(val node: FileNode) : FileListDialog()
     data class DeleteConfirm(val node: FileNode) : FileListDialog()
 }
+
+enum class DirectoryPickerPurpose { MOVE, COPY }
+
+/** State for the move/copy target-directory picker (v0.2_EXECUTION_PLAN.md
+ * §13.6/§16). [currentPath] is where the picker is currently browsing —
+ * starts at the file list's own [FileListUiState.currentPath], independent
+ * of it from then on. */
+data class DirectoryPickerUiState(
+    val purpose: DirectoryPickerPurpose,
+    val sourceNode: FileNode,
+    val currentPath: String,
+    val content: DirectoryPickerContent = DirectoryPickerContent.Loading,
+    val isSubmitting: Boolean = false,
+)
 
 data class FileListUiState(
     val instanceName: String = "",
@@ -51,6 +68,7 @@ data class FileListUiState(
     val dialogLoading: Boolean = false,
     val dialogError: String? = null,
     val snackbarMessage: String? = null,
+    val directoryPicker: DirectoryPickerUiState? = null,
 )
 
 @HiltViewModel
@@ -60,6 +78,7 @@ class FileListViewModel @Inject constructor(
     private val instanceRepository: InstanceRepository,
     private val authRepository: AuthRepository,
     private val fileOperationRepository: FileOperationRepository,
+    private val directoryPickerRepository: DirectoryPickerRepository,
 ) : ViewModel() {
 
     private val instanceId: String = checkNotNull(savedStateHandle["instanceId"])
@@ -243,6 +262,90 @@ class FileListViewModel @Inject constructor(
                 }
                 is ApiResult.Failure -> _uiState.update {
                     it.copy(dialogLoading = false, dialogError = result.error.toUserMessage())
+                }
+            }
+        }
+    }
+
+    // --- Move/copy target-directory picker --------------------------------
+
+    fun openMovePicker(node: FileNode) = openDirectoryPicker(DirectoryPickerPurpose.MOVE, node)
+
+    fun openCopyPicker(node: FileNode) = openDirectoryPicker(DirectoryPickerPurpose.COPY, node)
+
+    private fun openDirectoryPicker(purpose: DirectoryPickerPurpose, node: FileNode) {
+        _uiState.update {
+            it.copy(
+                actionSheetTarget = null,
+                directoryPicker = DirectoryPickerUiState(purpose = purpose, sourceNode = node, currentPath = it.currentPath),
+            )
+        }
+        loadDirectoryPickerEntries()
+    }
+
+    fun directoryPickerEnter(entry: DirectoryPickerEntry) {
+        updatePicker { it.copy(currentPath = entry.path) }
+        loadDirectoryPickerEntries()
+    }
+
+    fun directoryPickerNavigateToSegment(segmentCount: Int) {
+        val picker = _uiState.value.directoryPicker ?: return
+        val newPath = OpenListPathCodec.pathForSegment(picker.currentPath, segmentCount)
+        updatePicker { it.copy(currentPath = newPath) }
+        loadDirectoryPickerEntries()
+    }
+
+    fun directoryPickerRefresh() = loadDirectoryPickerEntries()
+
+    fun dismissDirectoryPicker() {
+        _uiState.update { it.copy(directoryPicker = null) }
+    }
+
+    fun confirmDirectoryPicker() {
+        val picker = _uiState.value.directoryPicker ?: return
+        viewModelScope.launch {
+            updatePicker { it.copy(isSubmitting = true) }
+            val srcDir = OpenListPathCodec.parent(picker.sourceNode.path)
+            val targetDir = picker.currentPath
+            val names = listOf(picker.sourceNode.name)
+            val actionLabel = if (picker.purpose == DirectoryPickerPurpose.MOVE) "移动" else "复制"
+            val result = when (picker.purpose) {
+                DirectoryPickerPurpose.MOVE -> fileOperationRepository.move(instanceId, srcDir, targetDir, names)
+                DirectoryPickerPurpose.COPY -> fileOperationRepository.copy(instanceId, srcDir, targetDir, names)
+            }
+            when (result) {
+                is ApiResult.Success -> {
+                    val batch = result.data
+                    val message = if (batch.successCount > 0) {
+                        "${actionLabel}成功"
+                    } else {
+                        batch.failedItems.firstOrNull()?.reason ?: "${actionLabel}失败"
+                    }
+                    _uiState.update { it.copy(directoryPicker = null, snackbarMessage = message) }
+                    if (batch.successCount > 0) refresh()
+                }
+                is ApiResult.Failure -> _uiState.update {
+                    it.copy(directoryPicker = null, snackbarMessage = result.error.toUserMessage())
+                }
+            }
+        }
+    }
+
+    private fun updatePicker(transform: (DirectoryPickerUiState) -> DirectoryPickerUiState) {
+        _uiState.update { st -> st.directoryPicker?.let { st.copy(directoryPicker = transform(it)) } ?: st }
+    }
+
+    private fun loadDirectoryPickerEntries() {
+        val picker = _uiState.value.directoryPicker ?: return
+        updatePicker { it.copy(content = DirectoryPickerContent.Loading) }
+        viewModelScope.launch {
+            when (val result = directoryPickerRepository.listDirectories(instanceId, picker.currentPath)) {
+                is ApiResult.Success -> {
+                    val entries = result.data.map { DirectoryPickerEntry(it.name, it.path) }
+                    updatePicker { it.copy(content = DirectoryPickerContent.Content(entries)) }
+                }
+                is ApiResult.Failure -> updatePicker {
+                    it.copy(content = DirectoryPickerContent.Error(result.error.toUserMessage()))
                 }
             }
         }

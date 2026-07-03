@@ -5,11 +5,13 @@ import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import io.openlist.client.core.domain.AuthRepository
+import io.openlist.client.core.domain.DirectoryPickerRepository
 import io.openlist.client.core.domain.FileOperationRepository
 import io.openlist.client.core.domain.FilesRepository
 import io.openlist.client.core.domain.InstanceRepository
 import io.openlist.client.core.domain.TransferRepository
 import io.openlist.client.data.repository.AuthRepositoryImpl
+import io.openlist.client.data.repository.DirectoryPickerRepositoryImpl
 import io.openlist.client.data.repository.FileOperationRepositoryImpl
 import io.openlist.client.data.repository.FilesRepositoryImpl
 import io.openlist.client.data.repository.InstanceRepositoryImpl
@@ -38,4 +40,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindFileOperationRepository(impl: FileOperationRepositoryImpl): FileOperationRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindDirectoryPickerRepository(impl: DirectoryPickerRepositoryImpl): DirectoryPickerRepository
 }

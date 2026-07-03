@@ -10,10 +10,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DriveFileMove
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DriveFileRenameOutline
+import androidx.compose.material.icons.filled.FileCopy
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Download
@@ -39,6 +41,7 @@ import io.openlist.client.core.designsystem.Spacing
 import io.openlist.client.core.designsystem.components.AppTopBar
 import io.openlist.client.core.designsystem.components.Breadcrumb
 import io.openlist.client.core.designsystem.components.ConfirmDialog
+import io.openlist.client.core.designsystem.components.DirectoryPickerSheet
 import io.openlist.client.core.designsystem.components.EmptyState
 import io.openlist.client.core.designsystem.components.ErrorBar
 import io.openlist.client.core.designsystem.components.FileActionItem
@@ -155,11 +158,27 @@ fun FileListScreen(
                 canWrite = uiState.canWrite,
                 onOpenDetail = { onOpenFileDetail(node.path) },
                 onRename = { viewModel.openRenameDialog(node) },
+                onMove = { viewModel.openMovePicker(node) },
+                onCopy = { viewModel.openCopyPicker(node) },
                 onDelete = { viewModel.openDeleteConfirm(node) },
                 onCopyPath = { clipboardManager.setText(AnnotatedString(node.path)) },
                 onCopyName = { clipboardManager.setText(AnnotatedString(node.name)) },
             ),
             onDismiss = { viewModel.dismissActionSheet() },
+        )
+    }
+
+    uiState.directoryPicker?.let { picker ->
+        DirectoryPickerSheet(
+            title = if (picker.purpose == DirectoryPickerPurpose.MOVE) "移动到" else "复制到",
+            breadcrumbSegments = listOf("根目录") + OpenListPathCodec.segments(picker.currentPath),
+            content = picker.content,
+            onSegmentClick = { index -> viewModel.directoryPickerNavigateToSegment(index) },
+            onEnterDirectory = { entry -> viewModel.directoryPickerEnter(entry) },
+            onSelectCurrent = { viewModel.confirmDirectoryPicker() },
+            onRefresh = { viewModel.directoryPickerRefresh() },
+            onDismiss = { viewModel.dismissDirectoryPicker() },
+            selecting = picker.isSubmitting,
         )
     }
 
@@ -212,6 +231,8 @@ private fun buildFileActions(
     canWrite: Boolean,
     onOpenDetail: () -> Unit,
     onRename: () -> Unit,
+    onMove: () -> Unit,
+    onCopy: () -> Unit,
     onDelete: () -> Unit,
     onCopyPath: () -> Unit,
     onCopyName: () -> Unit,
@@ -222,6 +243,8 @@ private fun buildFileActions(
     add(FileActionItem(label = "详情", icon = Icons.Filled.Info, onClick = onOpenDetail))
     if (canWrite) {
         add(FileActionItem(label = "重命名", icon = Icons.Filled.DriveFileRenameOutline, onClick = onRename))
+        add(FileActionItem(label = "移动", icon = Icons.AutoMirrored.Filled.DriveFileMove, onClick = onMove))
+        add(FileActionItem(label = "复制", icon = Icons.Filled.FileCopy, onClick = onCopy))
     }
     add(FileActionItem(label = "复制路径", icon = Icons.Filled.ContentCopy, onClick = onCopyPath))
     add(FileActionItem(label = "复制名称", icon = Icons.Filled.ContentCopy, onClick = onCopyName))
