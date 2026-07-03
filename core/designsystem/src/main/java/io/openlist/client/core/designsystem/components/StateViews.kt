@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import io.openlist.client.core.designsystem.OpenListPalette
 import io.openlist.client.core.designsystem.Spacing
 
 @Composable
@@ -38,12 +39,21 @@ fun EmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(
-            imageVector = Icons.Outlined.Inbox,
-            contentDescription = null,
-            modifier = Modifier.size(48.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        // Sticky-note style plate (DESIGN.md pastel tint pattern) behind the icon.
+        val plate = pastelStyle(OpenListPalette.TintYellow, OpenListPalette.BrandBrown)
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .background(plate.container, MaterialTheme.shapes.extraLarge),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Inbox,
+                contentDescription = null,
+                modifier = Modifier.size(36.dp),
+                tint = plate.content,
+            )
+        }
         androidx.compose.foundation.layout.Spacer(Modifier.size(Spacing.md))
         Text(
             text = title,

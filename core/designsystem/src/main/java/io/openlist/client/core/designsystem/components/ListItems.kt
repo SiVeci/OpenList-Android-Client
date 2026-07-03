@@ -16,8 +16,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Circle
-import androidx.compose.material.icons.outlined.Folder
-import androidx.compose.material.icons.outlined.InsertDriveFile
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -65,11 +63,7 @@ fun ListRowItem(
                 tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
-            Icon(
-                imageVector = if (isDir) Icons.Outlined.Folder else Icons.Outlined.InsertDriveFile,
-                contentDescription = null,
-                tint = if (isDir) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            FileTypeIconPlate(kind = fileKindOf(name, isDir))
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(

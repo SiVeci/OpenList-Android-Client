@@ -22,8 +22,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import io.openlist.client.core.designsystem.Spacing
 import io.openlist.client.core.designsystem.components.AppTextField
-import io.openlist.client.core.designsystem.components.AppTopBar
 import io.openlist.client.core.designsystem.components.ErrorBar
+import io.openlist.client.core.designsystem.components.HeroHeader
 import io.openlist.client.core.designsystem.components.LoadingState
 import io.openlist.client.core.designsystem.components.PrimaryButton
 import io.openlist.client.core.designsystem.components.SecondaryButton
@@ -48,7 +48,7 @@ fun LoginScreen(
 
     Scaffold(
         topBar = {
-            AppTopBar(
+            HeroHeader(
                 title = uiState.instanceName,
                 subtitle = uiState.instanceBaseUrl,
                 onBack = onSwitchInstance,

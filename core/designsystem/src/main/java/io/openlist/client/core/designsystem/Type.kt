@@ -2,14 +2,19 @@ package io.openlist.client.core.designsystem
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-// System sans-serif (platform default) is used deliberately: DESIGN.md specifies
-// "Notion Sans" which is a proprietary Inter-derivative we cannot legally bundle,
-// and this is a utility file browser where platform-native legibility beats novelty.
-private val AppFontFamily = FontFamily.Default
+// Inter (OFL, bundled in res/font): DESIGN.md specifies "Notion Sans", a
+// proprietary Inter-derivative we cannot legally ship — Inter is the first
+// fallback in its own font stack and the closest legal match.
+private val AppFontFamily = FontFamily(
+    Font(R.font.inter_regular, FontWeight.Normal),
+    Font(R.font.inter_medium, FontWeight.Medium),
+    Font(R.font.inter_semibold, FontWeight.SemiBold),
+)
 
 // Sizes scaled down from DESIGN.md's desktop marketing hierarchy (80px hero, etc.)
 // to a mobile information-density hierarchy; weight and tracking ratios preserved.

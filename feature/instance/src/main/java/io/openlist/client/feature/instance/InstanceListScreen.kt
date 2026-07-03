@@ -33,8 +33,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.openlist.client.core.designsystem.Spacing
-import io.openlist.client.core.designsystem.components.AppTopBar
 import io.openlist.client.core.designsystem.components.EmptyState
+import io.openlist.client.core.designsystem.components.HeroHeader
 import io.openlist.client.core.designsystem.components.PrimaryButton
 import io.openlist.client.core.designsystem.components.StatusBadge
 import io.openlist.client.core.designsystem.components.StatusTone
@@ -59,8 +59,9 @@ fun InstanceListScreen(
 
     Scaffold(
         topBar = {
-            AppTopBar(
+            HeroHeader(
                 title = "OpenList",
+                subtitle = "你的所有实例，一个入口",
                 actions = {
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Outlined.Settings, contentDescription = "设置")

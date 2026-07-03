@@ -32,6 +32,39 @@ object OpenListPalette {
     val Warning = Color(0xFFDD5B00)
     val Error = Color(0xFFE03131)
 
+    // colors.card-tint-* — pastel plate/chip backgrounds. Paired with the deep
+    // "badge-tag" partner inks below (DESIGN.md badge-tag-purple/-orange/-green
+    // pattern, extended to the remaining tints with same-hue deep partners).
+    val TintPeach = Color(0xFFFFE8D4)
+    val TintRose = Color(0xFFFDE0EC)
+    val TintMint = Color(0xFFD9F3E1)
+    val TintLavender = Color(0xFFE6E0F5)
+    val TintSky = Color(0xFFDCECFA)
+    val TintYellow = Color(0xFFFEF7D6)
+    val TintCream = Color(0xFFF8F5E8)
+    val TintGray = Color(0xFFF0EEEC)
+
+    val BrandOrangeDeep = Color(0xFF793400)
+    val BrandPinkDeep = Color(0xFFA02E6D)
+    val BrandPurple800 = Color(0xFF391C57)
+    val BrandGreen = Color(0xFF1AAE39)
+    val BrandBrown = Color(0xFF523410)
+    val LinkBlueDeep = Color(0xFF005BAB)
+
+    // colors.brand-navy / on-dark* — hero band family.
+    val BrandNavy = Color(0xFF0A1530)
+    val BrandNavyMid = Color(0xFF1A2A52)
+    val OnDark = Color(0xFFFFFFFF)
+    val OnDarkMuted = Color(0xFFA4A097)
+
+    // Brand color spectrum, used only as the hero band's sticky-note dot
+    // decoration (DESIGN.md hero-band-dark), never as text or surfaces.
+    val BrandPink = Color(0xFFFF64C8)
+    val BrandOrange = Color(0xFFDD5B00)
+    val BrandPurple = Color(0xFF7B3FF2)
+    val BrandTeal = Color(0xFF2A9D99)
+    val BrandYellow = Color(0xFFF5D75E)
+
     // Dark-theme surface ramp: DESIGN.md has no dark tokens (documented Known Gap),
     // derived here from the same navy/charcoal family used for on-dark text.
     val DarkCanvas = Color(0xFF15161A)

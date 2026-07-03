@@ -19,15 +19,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import io.openlist.client.core.designsystem.Spacing
 import io.openlist.client.core.designsystem.components.AppTopBar
 import io.openlist.client.core.designsystem.components.ErrorBar
+import io.openlist.client.core.designsystem.components.FileTypeBadge
+import io.openlist.client.core.designsystem.components.FileTypeIconPlate
 import io.openlist.client.core.designsystem.components.LoadingState
+import io.openlist.client.core.designsystem.components.fileKindOf
 import io.openlist.client.core.designsystem.components.PrimaryButton
 import io.openlist.client.core.designsystem.components.SecondaryButton
 import io.openlist.client.core.designsystem.components.StatusBadge
@@ -79,7 +84,20 @@ fun FileDetailScreen(
                         .padding(Spacing.md),
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
-                    Text(text = detail.name, style = MaterialTheme.typography.headlineSmall)
+                    val kind = fileKindOf(detail.name, detail.isDir)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        FileTypeIconPlate(kind = kind, size = 48.dp)
+                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+                            Text(text = detail.name, style = MaterialTheme.typography.headlineSmall)
+                            FileTypeBadge(
+                                text = if (detail.isDir) "目录" else detail.name.substringAfterLast('.', "").uppercase().ifEmpty { "文件" },
+                                kind = kind,
+                            )
+                        }
+                    }
                     DetailRow(label = "路径", value = detail.path)
                     if (!detail.isDir) {
                         DetailRow(label = "大小", value = formatSize(detail.size))

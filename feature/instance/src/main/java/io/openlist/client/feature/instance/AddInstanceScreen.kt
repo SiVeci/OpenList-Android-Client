@@ -20,8 +20,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import io.openlist.client.core.designsystem.Spacing
 import io.openlist.client.core.designsystem.components.AppTextField
-import io.openlist.client.core.designsystem.components.AppTopBar
 import io.openlist.client.core.designsystem.components.ErrorBar
+import io.openlist.client.core.designsystem.components.HeroHeader
 import io.openlist.client.core.designsystem.components.PrimaryButton
 import io.openlist.client.core.designsystem.components.SecondaryButton
 import io.openlist.client.core.designsystem.components.StatusBadge
@@ -41,7 +41,13 @@ fun AddInstanceScreen(
     }
 
     Scaffold(
-        topBar = { AppTopBar(title = "添加实例", onBack = onBack) },
+        topBar = {
+            HeroHeader(
+                title = "添加实例",
+                subtitle = "连接一个 OpenList 服务",
+                onBack = onBack,
+            )
+        },
     ) { padding ->
         Column(
             modifier = Modifier
