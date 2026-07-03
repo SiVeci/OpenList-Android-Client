@@ -58,3 +58,36 @@ fun SecondaryButton(
         Text(text, style = MaterialTheme.typography.labelLarge)
     }
 }
+
+/** Filled button in the error tone (DESIGN.md semantic-error) for the confirm
+ * action of destructive operations — delete confirmations, etc. */
+@Composable
+fun DangerActionButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    loading: Boolean = false,
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled && !loading,
+        shape = MaterialTheme.shapes.medium,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.error,
+            contentColor = MaterialTheme.colorScheme.onError,
+        ),
+        contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
+    ) {
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.onError,
+            )
+        } else {
+            Text(text, style = MaterialTheme.typography.labelLarge)
+        }
+    }
+}
