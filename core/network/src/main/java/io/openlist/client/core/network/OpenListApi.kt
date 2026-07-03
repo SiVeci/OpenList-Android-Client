@@ -8,7 +8,12 @@ import io.openlist.client.core.network.dto.FsListResp
 import io.openlist.client.core.network.dto.LoginHashReq
 import io.openlist.client.core.network.dto.LoginReq
 import io.openlist.client.core.network.dto.LoginResp
+import io.openlist.client.core.network.dto.MkdirReq
+import io.openlist.client.core.network.dto.MoveCopyReq
+import io.openlist.client.core.network.dto.RemoveReq
+import io.openlist.client.core.network.dto.RenameReq
 import io.openlist.client.core.network.dto.UserResp
+import kotlinx.serialization.json.JsonElement
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
@@ -60,4 +65,25 @@ interface OpenListApi {
 
     @POST("api/fs/get")
     suspend fun fsGet(@Body req: FsGetReq): ApiResponse<FsGetResp>
+
+    /** `data` is always null on success (server calls `common.SuccessResp(c)` with no payload). */
+    @POST("api/fs/mkdir")
+    suspend fun fsMkdir(@Body req: MkdirReq): ApiResponse<JsonElement?>
+
+    /** `data` is always null on success. */
+    @POST("api/fs/rename")
+    suspend fun fsRename(@Body req: RenameReq): ApiResponse<JsonElement?>
+
+    /** `data` is always null on success. */
+    @POST("api/fs/remove")
+    suspend fun fsRemove(@Body req: RemoveReq): ApiResponse<JsonElement?>
+
+    /** `data` carries `{message, tasks?}` on success; v0.2 only cares that the
+     * request was accepted (P7), so the payload shape isn't modeled further. */
+    @POST("api/fs/move")
+    suspend fun fsMove(@Body req: MoveCopyReq): ApiResponse<JsonElement?>
+
+    /** `data` carries `{message, tasks?}` on success; see [fsMove]. */
+    @POST("api/fs/copy")
+    suspend fun fsCopy(@Body req: MoveCopyReq): ApiResponse<JsonElement?>
 }

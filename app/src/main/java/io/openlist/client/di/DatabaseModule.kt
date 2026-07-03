@@ -7,6 +7,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import io.openlist.client.core.database.MIGRATION_4_5
 import io.openlist.client.core.database.OpenListDatabase
 import io.openlist.client.core.database.dao.DownloadTaskDao
 import io.openlist.client.core.database.dao.FileCacheDao
@@ -26,8 +27,8 @@ object DatabaseModule {
     fun provideDatabase(@ApplicationContext context: Context): OpenListDatabase =
         Room.databaseBuilder(context, OpenListDatabase::class.java, "openlist.db")
             // v0.1.0 has shipped with real user data, so schema bumps from here on
-            // require hand-written Migrations (registered here as they're added,
-            // starting with MIGRATION_4_5 in v0.2) instead of a destructive fallback.
+            // require hand-written Migrations instead of a destructive fallback.
+            .addMigrations(MIGRATION_4_5)
             .build()
 
     @Provides

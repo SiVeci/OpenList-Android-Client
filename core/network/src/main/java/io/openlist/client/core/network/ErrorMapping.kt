@@ -44,9 +44,38 @@ suspend fun <T> safeApiCall(block: suspend () -> ApiResponse<T>): ApiResult<T> {
     }
 }
 
+/**
+ * Like [safeApiCall], for write endpoints whose success response carries no
+ * usable `data` (mkdir/rename/remove always respond with `data: null`; move/
+ * copy's `{message, tasks?}` isn't modeled — see OpenListApi doc comments).
+ * Success is judged purely by `code`, never by data presence.
+ */
+suspend fun safeApiCallUnit(block: suspend () -> ApiResponse<*>): ApiResult<Unit> {
+    return try {
+        val response = block()
+        if (response.code in 200..299) {
+            ApiResult.Success(Unit)
+        } else {
+            ApiResult.Failure(codeToDomainError(response.code, response.message))
+        }
+    } catch (t: Throwable) {
+        ApiResult.Failure(t.toDomainError())
+    }
+}
+
 private fun codeToDomainError(code: Int, message: String): DomainError = when (code) {
     401 -> DomainError.Unauthorized
-    403 -> DomainError.Forbidden
+    // The server reuses HTTP 403 for both real permission-denied responses and
+    // naming conflicts (e.g. rename/move/copy without overwrite: `file [x]
+    // exists`, server/handles/fsmanage.go) — same status, no distinct code.
+    // Only the message tells them apart, so a conflict-shaped message is kept
+    // verbatim (OpenListError) instead of being collapsed into the generic
+    // "no permission" copy, per v0.2_EXECUTION_PLAN.md §10.3/P1.
+    403 -> if (message.contains("exist", ignoreCase = true)) {
+        DomainError.OpenListError(code, message)
+    } else {
+        DomainError.Forbidden
+    }
     404 -> DomainError.NotFound
     in 500..599 -> DomainError.ServerError
     else -> DomainError.OpenListError(code, message)

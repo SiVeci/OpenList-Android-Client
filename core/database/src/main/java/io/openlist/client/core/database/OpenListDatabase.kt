@@ -20,7 +20,7 @@ import io.openlist.client.core.database.entity.SessionEntity
         FileCacheEntity::class,
         DownloadTaskEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class OpenListDatabase : RoomDatabase() {

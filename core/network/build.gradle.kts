@@ -49,7 +49,9 @@ dependencies {
     implementation(libs.squareup.retrofit.kotlinx.serialization.converter)
     implementation(libs.squareup.okhttp.logging.interceptor)
 
-    implementation(libs.kotlinx.serialization.json)
+    // api: JsonElement is part of OpenListApi's mutation-endpoint return types
+    // (mkdir/rename/remove/move/copy), for the same reason as Retrofit/OkHttp above.
+    api(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)

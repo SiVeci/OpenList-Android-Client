@@ -77,6 +77,7 @@ class AuthRepositoryImpl @Inject constructor(
                 val updated = existing.copy(
                     username = result.data.username.ifBlank { null },
                     role = result.data.role,
+                    permission = result.data.permission,
                     updatedAt = System.currentTimeMillis(),
                 )
                 sessionDao.upsert(updated)
@@ -117,6 +118,7 @@ class AuthRepositoryImpl @Inject constructor(
             username = user.username.ifBlank { null },
             tokenEncrypted = tokenPlain?.let(cryptoManager::encrypt),
             role = user.role,
+            permission = user.permission,
             isGuest = isGuest,
             createdAt = now,
             updatedAt = now,
@@ -137,6 +139,7 @@ class AuthRepositoryImpl @Inject constructor(
         authType = AuthType.valueOf(authType),
         username = username,
         role = role,
+        permission = permission,
         isGuest = isGuest,
         createdAt = createdAt,
         updatedAt = updatedAt,

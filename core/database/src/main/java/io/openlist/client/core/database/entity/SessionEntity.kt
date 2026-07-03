@@ -18,6 +18,9 @@ data class SessionEntity(
     val username: String?,
     val tokenEncrypted: String?,
     val role: Int,
+    /** OpenList `/api/me` permission bitmask (v0.2, Migration 4→5). Defaults to
+     * 0 for rows written before this column existed. */
+    val permission: Int = 0,
     val isGuest: Boolean,
     val createdAt: Long,
     val updatedAt: Long,

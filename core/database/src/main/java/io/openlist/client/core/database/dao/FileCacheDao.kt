@@ -32,6 +32,12 @@ interface FileCacheDao {
     @Query("DELETE FROM file_cache WHERE instanceId = :instanceId")
     suspend fun deleteByInstanceId(instanceId: String)
 
+    /** Drops a directory's own cached listing plus every cached listing nested
+     * under it (v0.2_EXECUTION_PLAN.md §18) — used after remove/move/rename so
+     * a moved/deleted subtree's stale child listings can't resurface. */
+    @Query("DELETE FROM file_cache WHERE instanceId = :instanceId AND (parentPath = :pathPrefix OR parentPath LIKE :pathPrefix || '/%')")
+    suspend fun deleteByPathPrefix(instanceId: String, pathPrefix: String)
+
     /** Settings' "清理缓存" — every instance's directory cache. */
     @Query("DELETE FROM file_cache")
     suspend fun clearAll()

@@ -5,10 +5,12 @@ import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import io.openlist.client.core.domain.AuthRepository
+import io.openlist.client.core.domain.FileOperationRepository
 import io.openlist.client.core.domain.FilesRepository
 import io.openlist.client.core.domain.InstanceRepository
 import io.openlist.client.core.domain.TransferRepository
 import io.openlist.client.data.repository.AuthRepositoryImpl
+import io.openlist.client.data.repository.FileOperationRepositoryImpl
 import io.openlist.client.data.repository.FilesRepositoryImpl
 import io.openlist.client.data.repository.InstanceRepositoryImpl
 import io.openlist.client.data.repository.TransferRepositoryImpl
@@ -32,4 +34,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindTransferRepository(impl: TransferRepositoryImpl): TransferRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindFileOperationRepository(impl: FileOperationRepositoryImpl): FileOperationRepository
 }
