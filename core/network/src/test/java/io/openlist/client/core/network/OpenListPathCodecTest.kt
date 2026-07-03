@@ -105,4 +105,47 @@ class OpenListPathCodecTest {
     fun `buildDownloadUrl returns null for an invalid base url`() {
         assertNull(OpenListPathCodec.buildDownloadUrl("not a url", "/a", ""))
     }
+
+    // --- encodePathForHeader (v0.2 upload File-Path header, §17.4/§23.6's
+    // path-encoding set: Chinese, spaces, parens, #, &, multi-level, root,
+    // sub-path deployment, dots, long extensions) -----------------------
+
+    @Test
+    fun `encodePathForHeader keeps literal slashes as separators, never percent-encoded`() {
+        // The server unescapes the whole header with Go's url.PathUnescape,
+        // which does not treat "/" specially — a blanket URLEncoder-style
+        // escape turning "/" into "%2F" would merge every directory level
+        // into one bogus segment name server-side.
+        val encoded = OpenListPathCodec.encodePathForHeader("/a/b/c")
+        assertEquals(listOf("", "a", "b", "c"), encoded.split("/"))
+    }
+
+    @Test
+    fun `encodePathForHeader root path`() {
+        assertEquals("/", OpenListPathCodec.encodePathForHeader("/"))
+    }
+
+    @Test
+    fun `encodePathForHeader round-trips chinese, spaces, parens, hash and ampersand per segment`() {
+        val cases = listOf(
+            "/中文目录/文件.txt",
+            "/my folder/file name.txt",
+            "/a(b)c/d(e)f.txt",
+            "/a#b/c#d.txt",
+            "/a&b/c&d.txt",
+            "/多级/子/目录/深层.txt",
+            "/子路径实例/openlist/中文 (1)/文件#2&3.txt",
+            "/a.b.c/file.tar.gz",
+            "/dir/very.long.extension.name.with.many.dots.abcdefghijklmnop",
+        )
+        for (path in cases) {
+            val encoded = OpenListPathCodec.encodePathForHeader(path)
+            // Round-trip through a real HttpUrl parse+decode, mirroring what
+            // the server does with url.PathUnescape: each segment must come
+            // back exactly as it went in, and the segment count (slash
+            // positions) must be unchanged.
+            val decodedSegments = ("http://x$encoded").toHttpUrl().pathSegments
+            assertEquals("mismatch for $path", OpenListPathCodec.segments(path), decodedSegments)
+        }
+    }
 }

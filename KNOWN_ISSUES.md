@@ -1,30 +1,58 @@
-# Known Issues (v0.1.0)
+# Known Issues (v0.2.0)
 
-这些是 v0.1 范围内已知的限制，多数是刻意的范围裁剪（见 [v0.1_PRD.md](v0.1_PRD.md) §2 "v0.1 不追求的目标"），而非缺陷；按后续可能修复/扩展的方向列出。
+v0.1 的已知限制见文末"v0.1.0（历史）"一节。以下是 v0.2 范围内已知的限制，多数是刻意的范围裁剪（见 [v0.2_PRD.md](v0.2_PRD.md) §5.3 "明确不做功能"），而非缺陷。
 
-## 下载
+## 未在真机上验证的项目
 
-- 下载任务在应用内只记录到"已入队"（`DownloadTaskEntity.status = ENQUEUED`）。真正的下载失败（404、签名过期、权限不足等）由系统 `DownloadManager` 的通知栏原生承接，应用内不会二次感知或更新任务状态为成功/失败。要做到这一点需要监听 `ACTION_DOWNLOAD_COMPLETE` 广播并查询 `DownloadManager`，属于 v0.2+ 自研下载器范畴。
-- 未提供应用内的下载历史/任务列表页面（v0.1_PRD 中标注为可选项）。
-- 同名文件冲突依赖 `DownloadManager` 默认的自动加后缀行为，应用未额外处理覆盖确认。
+本轮开发环境没有连接的 Android 设备/模拟器（无 `adb` 可用），以下项目仅完成了编译与单元测试层面的验证，**尚未做真机人工验证**：
+
+- 真实 OpenList 实例上的上传全流程（小/中文件、中文名、空格名、多文件并发、无权限目录、网络中断、Token 失效、用户取消、切页/切后台）。
+- 移动/复制的"同存储是否即时完成"（因存储驱动而异，客户端已按"提交≠就位"处理，展示"操作已提交，请稍后刷新"）。
+- 深色模式与 DESIGN.md 视觉走查（组件层面遵循了既有 token，但未做系统性人工过一遍）。
+- APK 实机安装与登录→浏览→上传→写操作→下载完整路径的手工回归。
+
+建议在自建 OpenList 实例上过一遍 [v0.2_EXECUTION_PLAN.md](v0.2_EXECUTION_PLAN.md) §23 验收清单再发布。
+
+## 权限门控
+
+- 写入口的显示逻辑是"游客隐藏、已登录用户乐观展示"，**不**依据 `Session.permission` 位掩码做隐藏判断——因为该字段是 v0.2 才新增（Migration 4→5），迁移后老会话的位掩码读数为 0 直到下次 `/api/me` 刷新，若据此隐藏会导致真正有权限的用户在升级后短暂看不到写入口。真正的权限判定以后端 403 响应为准（响应式提示"无权限"）。
+- 目录级 `FsListResp.write` 字段目前未接入门控逻辑（该字段在写后失效路径外未被读取/持久化）；如需更精确的门控，需要扩展目录缓存以携带该标志位。
+
+## 上传
+
+- 不支持断点续传、分片上传、秒传、多线程上传、目录递归上传（`UploadTaskEntity` 已预留 `totalBytes`/`uploadedBytes` 字段供后续实现复用）。
+- 上传失败无一键"重新上传"入口（`UploadRepository` 未实现 `retryUpload`）。
+- 前台服务通知（长任务常驻通知）未实现，仅有 `POST_NOTIFICATIONS`/`FOREGROUND_SERVICE*` 权限声明；上传进度目前只能在应用内的上传面板查看。
+- 上传任务的取消不会主动终止 WorkManager 里已入队但尚未开始的任务之外的场景验证（依赖 `Call.cancel()` 中断已开始的连接，逻辑已实现但未真机验证）。
+
+## 批量操作
+
+- 批量删除/移动/复制在客户端逐项串行调用后端（而非后端原生批量接口的单请求语义），大批量选择会放大请求数；与 Web 端单请求行为存在差异，尚未建立 `Parity_Matrix.md` 正式记录。
+- 不支持批量重命名。
 
 ## 鉴权与会话
 
-- 会话有效性只在进入登录页（或应用重新导航到该实例）时通过一次 `/api/me` 校验；没有后台定时刷新或应用切前台时的主动重新校验。
-- 不支持 2FA、LDAP 登录、SSO、WebAuthn、Hash 登录的 UI；对应的网络层方法（`loginHash` 等）已预留但未接入界面。
-- 不支持自签证书；HTTPS 严格校验系统信任锚，暂无"忽略证书错误"或"添加自定义 CA"的入口。
+- （沿用 v0.1）会话有效性只在进入登录页或应用重新导航到该实例时通过一次 `/api/me` 校验；无后台定时刷新。
+- 不支持 2FA、LDAP、SSO、WebAuthn 登录 UI；不支持自签证书。
 
 ## 功能范围
 
-- 无搜索、上传、文件操作（新建目录/重命名/移动/复制/删除）、分享、预览（图片/视频/文本/Markdown）、离线下载、归档浏览、Torrent、管理台。均已在包结构和网络层预留，具体见 [v0.1_EXECUTION_PLAN.md](v0.1_EXECUTION_PLAN.md) §17。
+- 无搜索、分享、完整任务中心、离线下载、预览（图片/视频/文本/Markdown/PDF/Office）、归档浏览、管理台。均已在包结构和网络层预留，具体见 [v0.2_EXECUTION_PLAN.md](v0.2_EXECUTION_PLAN.md) §27。
 
 ## 测试与验收覆盖
 
-- 自动化测试仅覆盖 `core/network` 的纯逻辑部分（路径编解码 `OpenListPathCodec`、Base URL 规范化 `BaseUrlNormalizer`），没有 Repository/ViewModel 单元测试或 Compose UI 测试。
-- 多实例隔离、子路径部署、HTTP/HTTPS 混合实例、中文/空格/特殊符号真实服务端路径等场景，需要人工在真实 OpenList 实例上验证（见 v0.1_EXECUTION_PLAN.md §13 验收清单），本轮未在真机上执行。
+- 自动化测试覆盖 `core/network` 的路径编解码/Base URL 规范化，以及 `data:repository` 的批量操作聚合逻辑（`FileOperationRepositoryImplTest`：全成/全败/部分失败/401 提前终止）。仍未覆盖 ViewModel 或 Compose UI 测试，Room Migration 也未做 `MigrationTestHelper` 插桩测试（需要设备/模拟器）。
 
 ## 工程/发布
 
-- Room 数据库版本升级目前使用 `fallbackToDestructiveMigration`（发布前迭代的正常做法）。首次正式发布后如果继续升级 schema，必须改为正式 `Migration`，否则会清空用户本地数据。
-- 网络请求统一 30 秒超时，无重试/指数退避策略。
-- 深色模式色板已定义（`core/designsystem`），但未做系统性的视觉走查。
+- Room 数据库已从 `fallbackToDestructiveMigration` 转为正式 Migration（4→5 加 `permission` 列，5→6 加 `upload_tasks` 表），迁移 SQL 已与 Room 自身导出的 schema JSON 逐字段核对，但未在真机上验证真实升级路径（旧版本 APK → 新版本 APK 的实际迁移过程）。
+- 深色模式色板已定义，但未做系统性的视觉走查。
+
+---
+
+## v0.1.0（历史）
+
+- 下载任务在应用内只记录到"已入队"，真正的下载完成/失败由系统 `DownloadManager` 通知栏原生承接，应用内不二次感知。
+- 未提供应用内下载历史/任务列表页面。
+- 会话有效性无后台定时刷新；不支持 2FA/LDAP/SSO/WebAuthn/自签证书。
+- 网络请求统一 30 秒超时，无重试/指数退避策略（v0.2 的上传 client 例外，见上文）。

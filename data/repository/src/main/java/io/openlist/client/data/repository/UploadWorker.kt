@@ -7,6 +7,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import io.openlist.client.core.auth.SessionManager
 import io.openlist.client.core.auth.TokenProvider
 import io.openlist.client.core.database.dao.FileCacheDao
 import io.openlist.client.core.database.dao.UploadTaskDao
@@ -44,6 +45,7 @@ class UploadWorker @AssistedInject constructor(
     private val uploadHttpClient: UploadHttpClient,
     private val tokenProvider: TokenProvider,
     private val fileCacheDao: FileCacheDao,
+    private val sessionManager: SessionManager,
     private val json: Json,
 ) : CoroutineWorker(context, params) {
 
@@ -99,7 +101,16 @@ class UploadWorker @AssistedInject constructor(
                     fileCacheDao.clearDirectory(task.instanceId, task.targetDir)
                     Result.success()
                 } else {
-                    fail(taskId, parseErrorMessage(response) ?: "上传失败 (${response.code})")
+                    // Matches every other write path (FileOperationRepositoryImpl):
+                    // a 401 here means the token expired server-side and must
+                    // drop the local session so the next screen visit re-prompts
+                    // login, not just fail this one upload (v0.2_EXECUTION_PLAN.md §8.4).
+                    if (response.code == 401) {
+                        sessionManager.invalidate(task.instanceId)
+                        fail(taskId, "登录已失效，请重新登录")
+                    } else {
+                        fail(taskId, parseErrorMessage(response) ?: "上传失败 (${response.code})")
+                    }
                 }
             }
         } catch (io: IOException) {
