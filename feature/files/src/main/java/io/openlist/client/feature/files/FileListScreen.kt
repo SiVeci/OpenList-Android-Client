@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.FileCopy
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -27,18 +28,23 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import io.openlist.client.core.designsystem.Spacing
 import io.openlist.client.core.designsystem.components.AppTopBar
+import io.openlist.client.core.designsystem.components.BatchSelectionTopBar
 import io.openlist.client.core.designsystem.components.Breadcrumb
 import io.openlist.client.core.designsystem.components.ConfirmDialog
 import io.openlist.client.core.designsystem.components.DirectoryPickerSheet
@@ -67,36 +73,50 @@ fun FileListScreen(
     val uiState by viewModel.uiState.collectAsState()
     val clipboardManager = LocalClipboardManager.current
     val snackbarHostState = remember { SnackbarHostState() }
+    var showFailureDetails by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = uiState.currentPath != "/") {
-        viewModel.navigateToParent()
+    BackHandler(enabled = uiState.selectionMode || uiState.currentPath != "/") {
+        if (uiState.selectionMode) viewModel.exitSelectionMode() else viewModel.navigateToParent()
     }
 
     LaunchedEffect(uiState.snackbarMessage) {
-        uiState.snackbarMessage?.let { message ->
-            snackbarHostState.showSnackbar(message)
-            viewModel.dismissSnackbar()
-        }
+        val message = uiState.snackbarMessage ?: return@LaunchedEffect
+        val hasFailures = !uiState.failureDetails.isNullOrEmpty()
+        val result = snackbarHostState.showSnackbar(message, actionLabel = if (hasFailures) "查看" else null)
+        if (result == SnackbarResult.ActionPerformed) showFailureDetails = true
+        viewModel.dismissSnackbar()
     }
 
     Scaffold(
         topBar = {
-            Column {
-                AppTopBar(
-                    title = uiState.instanceName,
-                    onBack = onBackToInstances,
-                    actions = {
-                        if (uiState.canWrite) {
-                            IconButton(onClick = { viewModel.openNewFolderDialog() }) {
-                                Icon(Icons.Filled.CreateNewFolder, contentDescription = "新建目录")
+            if (uiState.selectionMode) {
+                BatchSelectionTopBar(
+                    selectedCount = uiState.selectedPaths.size,
+                    allSelected = uiState.allSelected,
+                    onExit = { viewModel.exitSelectionMode() },
+                    onToggleSelectAll = { viewModel.toggleSelectAll() },
+                    onDelete = { viewModel.openBatchDeleteConfirm() },
+                    onMove = { viewModel.openBatchMovePicker() },
+                    onCopy = { viewModel.openBatchCopyPicker() },
+                )
+            } else {
+                Column {
+                    AppTopBar(
+                        title = uiState.instanceName,
+                        onBack = onBackToInstances,
+                        actions = {
+                            if (uiState.canWrite) {
+                                IconButton(onClick = { viewModel.openNewFolderDialog() }) {
+                                    Icon(Icons.Filled.CreateNewFolder, contentDescription = "新建目录")
+                                }
                             }
-                        }
-                    },
-                )
-                Breadcrumb(
-                    segments = listOf("根目录") + OpenListPathCodec.segments(uiState.currentPath),
-                    onSegmentClick = { index -> viewModel.navigateToSegmentCount(index) },
-                )
+                        },
+                    )
+                    Breadcrumb(
+                        segments = listOf("根目录") + OpenListPathCodec.segments(uiState.currentPath),
+                        onSegmentClick = { index -> viewModel.navigateToSegmentCount(index) },
+                    )
+                }
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -134,12 +154,19 @@ fun FileListScreen(
                                 isDir = node.isDir,
                                 sizeText = if (node.isDir) null else formatSize(node.size),
                                 modifiedText = node.modifiedAt?.let(::formatDate),
-                                onClick = {
-                                    if (node.isDir) viewModel.navigateTo(node.path) else onOpenFileDetail(node.path)
+                                selectionMode = uiState.selectionMode,
+                                selected = node.path in uiState.selectedPaths,
+                                onClick = { viewModel.onNodeClick(node, onOpenFileDetail) },
+                                onLongClick = if (uiState.canWrite && !uiState.selectionMode) {
+                                    { viewModel.enterSelectionMode(node) }
+                                } else {
+                                    null
                                 },
                                 trailing = {
-                                    IconButton(onClick = { viewModel.openActionSheet(node) }) {
-                                        Icon(Icons.Filled.MoreVert, contentDescription = "更多")
+                                    if (!uiState.selectionMode) {
+                                        IconButton(onClick = { viewModel.openActionSheet(node) }) {
+                                            Icon(Icons.Filled.MoreVert, contentDescription = "更多")
+                                        }
                                     }
                                 },
                             )
@@ -182,6 +209,28 @@ fun FileListScreen(
         )
     }
 
+    if (showFailureDetails) {
+        uiState.failureDetails?.let { failures ->
+            AlertDialog(
+                onDismissRequest = { showFailureDetails = false },
+                title = { Text("失败详情") },
+                text = {
+                    Column {
+                        failures.forEach { failure ->
+                            Text(
+                                "${failure.path}：${failure.reason}",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showFailureDetails = false }) { Text("关闭") }
+                },
+            )
+        }
+    }
+
     when (val dialog = uiState.dialog) {
         FileListDialog.NewFolder -> TextInputDialog(
             title = "新建目录",
@@ -212,6 +261,16 @@ fun FileListScreen(
             } else {
                 "确定删除「${dialog.node.name}」吗？此操作可能无法撤销。"
             },
+            onConfirm = viewModel::confirmDialog,
+            onDismiss = viewModel::dismissDialog,
+            confirmText = "删除",
+            danger = true,
+            loading = uiState.dialogLoading,
+            errorMessage = uiState.dialogError,
+        )
+        is FileListDialog.BatchDeleteConfirm -> ConfirmDialog(
+            title = "删除",
+            message = "确定删除已选择的 ${dialog.count} 个项目吗？此操作可能无法撤销。",
             onConfirm = viewModel::confirmDialog,
             onDismiss = viewModel::dismissDialog,
             confirmText = "删除",

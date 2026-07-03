@@ -1,6 +1,9 @@
 package io.openlist.client.core.designsystem.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,7 +13,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.InsertDriveFile
 import androidx.compose.material3.Icon
@@ -26,7 +31,11 @@ import io.openlist.client.core.designsystem.Spacing
 /**
  * Single file/directory row for the file list screen.
  * [sizeText] and [modifiedText] are pre-formatted by the caller (locale-aware).
+ * [selectionMode]/[selected] render a checkbox-style leading icon and a tinted
+ * background instead of the usual folder/file icon (v0.2_EXECUTION_PLAN.md §12.8);
+ * [onLongClick] is how the caller enters selection mode in the first place.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ListRowItem(
     name: String,
@@ -35,21 +44,33 @@ fun ListRowItem(
     sizeText: String? = null,
     modifiedText: String? = null,
     onClick: () -> Unit = {},
+    onLongClick: (() -> Unit)? = null,
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
     trailing: @Composable () -> Unit = {},
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .background(if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surface)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = Spacing.md, vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Icon(
-            imageVector = if (isDir) Icons.Outlined.Folder else Icons.Outlined.InsertDriveFile,
-            contentDescription = null,
-            tint = if (isDir) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        if (selectionMode) {
+            Icon(
+                imageVector = if (selected) Icons.Outlined.CheckCircle else Icons.Outlined.Circle,
+                contentDescription = null,
+                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            Icon(
+                imageVector = if (isDir) Icons.Outlined.Folder else Icons.Outlined.InsertDriveFile,
+                contentDescription = null,
+                tint = if (isDir) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = name,

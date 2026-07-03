@@ -8,12 +8,14 @@ import io.openlist.client.core.common.ApiResult
 import io.openlist.client.core.common.toUserMessage
 import io.openlist.client.core.designsystem.components.DirectoryPickerContent
 import io.openlist.client.core.designsystem.components.DirectoryPickerEntry
+import io.openlist.client.core.designsystem.components.buildOperationResultMessage
 import io.openlist.client.core.domain.AuthRepository
 import io.openlist.client.core.domain.DirectoryPickerRepository
 import io.openlist.client.core.domain.FileListResult
 import io.openlist.client.core.domain.FileOperationRepository
 import io.openlist.client.core.domain.FilesRepository
 import io.openlist.client.core.domain.InstanceRepository
+import io.openlist.client.core.model.BatchOperationFailure
 import io.openlist.client.core.model.FileNode
 import io.openlist.client.core.network.OpenListPathCodec
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,23 +29,28 @@ import java.net.URLDecoder
 import javax.inject.Inject
 
 /** A single file/directory's write-action menu and the mkdir/rename/delete
- * dialogs it opens (v0.2_EXECUTION_PLAN.md §13.3/§13.4/§13.5). Move/copy go
- * through [DirectoryPickerUiState] instead, since they need a target directory. */
+ * dialogs it opens (v0.2_EXECUTION_PLAN.md §13.3/§13.4/§13.5). */
 sealed class FileListDialog {
     data object NewFolder : FileListDialog()
     data class Rename(val node: FileNode) : FileListDialog()
     data class DeleteConfirm(val node: FileNode) : FileListDialog()
+    data class BatchDeleteConfirm(val count: Int) : FileListDialog()
 }
 
 enum class DirectoryPickerPurpose { MOVE, COPY }
 
-/** State for the move/copy target-directory picker (v0.2_EXECUTION_PLAN.md
- * §13.6/§16). [currentPath] is where the picker is currently browsing —
- * starts at the file list's own [FileListUiState.currentPath], independent
- * of it from then on. */
+/**
+ * State for the move/copy target-directory picker (v0.2_EXECUTION_PLAN.md
+ * §13.6/§16), shared by the single-item action-sheet flow and batch
+ * selection — both ultimately just move/copy [sourceNames] out of
+ * [sourceDir], since a selection can only span one currently-browsed
+ * directory. [currentPath] is where the picker is browsing, independent of
+ * the file list's own [FileListUiState.currentPath] from the moment it opens.
+ */
 data class DirectoryPickerUiState(
     val purpose: DirectoryPickerPurpose,
-    val sourceNode: FileNode,
+    val sourceDir: String,
+    val sourceNames: List<String>,
     val currentPath: String,
     val content: DirectoryPickerContent = DirectoryPickerContent.Loading,
     val isSubmitting: Boolean = false,
@@ -68,8 +75,16 @@ data class FileListUiState(
     val dialogLoading: Boolean = false,
     val dialogError: String? = null,
     val snackbarMessage: String? = null,
+    val snackbarIsError: Boolean = false,
     val directoryPicker: DirectoryPickerUiState? = null,
-)
+    /** Non-null while the "查看失败项" dialog from a partially-failed batch
+     * operation is open (v0.2_EXECUTION_PLAN.md §17). */
+    val failureDetails: List<BatchOperationFailure>? = null,
+    val selectionMode: Boolean = false,
+    val selectedPaths: Set<String> = emptySet(),
+) {
+    val allSelected: Boolean get() = nodes.isNotEmpty() && selectedPaths.size == nodes.size
+}
 
 @HiltViewModel
 class FileListViewModel @Inject constructor(
@@ -149,6 +164,19 @@ class FileListViewModel @Inject constructor(
         navigateTo(OpenListPathCodec.pathForSegment(_uiState.value.currentPath, segmentCount))
     }
 
+    /** Tapping a row: navigates/opens detail normally, or toggles selection
+     * in batch mode — directories are never entered while selecting
+     * (v0.2_EXECUTION_PLAN.md §12.8 point 10). */
+    fun onNodeClick(node: FileNode, onOpenFileDetail: (String) -> Unit) {
+        if (_uiState.value.selectionMode) {
+            toggleSelection(node)
+        } else if (node.isDir) {
+            navigateTo(node.path)
+        } else {
+            onOpenFileDetail(node.path)
+        }
+    }
+
     // --- File action menu -------------------------------------------------
 
     fun openActionSheet(node: FileNode) {
@@ -197,6 +225,7 @@ class FileListViewModel @Inject constructor(
             is FileListDialog.NewFolder -> mkdir()
             is FileListDialog.Rename -> rename(dialog.node)
             is FileListDialog.DeleteConfirm -> delete(dialog.node)
+            is FileListDialog.BatchDeleteConfirm -> batchDelete()
             null -> Unit
         }
     }
@@ -267,17 +296,94 @@ class FileListViewModel @Inject constructor(
         }
     }
 
+    // --- Batch selection ----------------------------------------------------
+
+    fun enterSelectionMode(node: FileNode) {
+        _uiState.update { it.copy(selectionMode = true, selectedPaths = setOf(node.path)) }
+    }
+
+    fun exitSelectionMode() {
+        _uiState.update { it.copy(selectionMode = false, selectedPaths = emptySet()) }
+    }
+
+    private fun toggleSelection(node: FileNode) {
+        _uiState.update {
+            val selected = it.selectedPaths
+            it.copy(selectedPaths = if (node.path in selected) selected - node.path else selected + node.path)
+        }
+    }
+
+    fun toggleSelectAll() {
+        _uiState.update {
+            if (it.allSelected) it.copy(selectedPaths = emptySet()) else it.copy(selectedPaths = it.nodes.map { n -> n.path }.toSet())
+        }
+    }
+
+    fun openBatchDeleteConfirm() {
+        val count = _uiState.value.selectedPaths.size
+        if (count == 0) return
+        _uiState.update { it.copy(dialog = FileListDialog.BatchDeleteConfirm(count), dialogError = null) }
+    }
+
+    private fun batchDelete() {
+        val selected = _uiState.value.selectedPaths
+        if (selected.isEmpty()) return
+        val dir = _uiState.value.currentPath
+        val names = selected.map { OpenListPathCodec.name(it) }
+        viewModelScope.launch {
+            _uiState.update { it.copy(dialogLoading = true, dialogError = null) }
+            when (val result = fileOperationRepository.remove(instanceId, dir, names)) {
+                is ApiResult.Success -> {
+                    val batch = result.data
+                    val message = buildOperationResultMessage(batch.total, batch.successCount, batch.failedCount)
+                    _uiState.update {
+                        it.copy(
+                            dialog = null,
+                            dialogLoading = false,
+                            selectionMode = false,
+                            selectedPaths = emptySet(),
+                            snackbarMessage = message.text,
+                            snackbarIsError = message.isError,
+                            failureDetails = if (batch.failedItems.isNotEmpty()) batch.failedItems else null,
+                        )
+                    }
+                    if (batch.successCount > 0) refresh()
+                }
+                is ApiResult.Failure -> _uiState.update {
+                    it.copy(dialogLoading = false, dialogError = result.error.toUserMessage())
+                }
+            }
+        }
+    }
+
     // --- Move/copy target-directory picker --------------------------------
 
-    fun openMovePicker(node: FileNode) = openDirectoryPicker(DirectoryPickerPurpose.MOVE, node)
+    fun openMovePicker(node: FileNode) = openDirectoryPicker(DirectoryPickerPurpose.MOVE, OpenListPathCodec.parent(node.path), listOf(node.name))
 
-    fun openCopyPicker(node: FileNode) = openDirectoryPicker(DirectoryPickerPurpose.COPY, node)
+    fun openCopyPicker(node: FileNode) = openDirectoryPicker(DirectoryPickerPurpose.COPY, OpenListPathCodec.parent(node.path), listOf(node.name))
 
-    private fun openDirectoryPicker(purpose: DirectoryPickerPurpose, node: FileNode) {
+    fun openBatchMovePicker() {
+        val selected = _uiState.value.selectedPaths
+        if (selected.isEmpty()) return
+        openDirectoryPicker(DirectoryPickerPurpose.MOVE, _uiState.value.currentPath, selected.map { OpenListPathCodec.name(it) })
+    }
+
+    fun openBatchCopyPicker() {
+        val selected = _uiState.value.selectedPaths
+        if (selected.isEmpty()) return
+        openDirectoryPicker(DirectoryPickerPurpose.COPY, _uiState.value.currentPath, selected.map { OpenListPathCodec.name(it) })
+    }
+
+    private fun openDirectoryPicker(purpose: DirectoryPickerPurpose, sourceDir: String, names: List<String>) {
         _uiState.update {
             it.copy(
                 actionSheetTarget = null,
-                directoryPicker = DirectoryPickerUiState(purpose = purpose, sourceNode = node, currentPath = it.currentPath),
+                directoryPicker = DirectoryPickerUiState(
+                    purpose = purpose,
+                    sourceDir = sourceDir,
+                    sourceNames = names,
+                    currentPath = it.currentPath,
+                ),
             )
         }
         loadDirectoryPickerEntries()
@@ -305,27 +411,30 @@ class FileListViewModel @Inject constructor(
         val picker = _uiState.value.directoryPicker ?: return
         viewModelScope.launch {
             updatePicker { it.copy(isSubmitting = true) }
-            val srcDir = OpenListPathCodec.parent(picker.sourceNode.path)
-            val targetDir = picker.currentPath
-            val names = listOf(picker.sourceNode.name)
-            val actionLabel = if (picker.purpose == DirectoryPickerPurpose.MOVE) "移动" else "复制"
             val result = when (picker.purpose) {
-                DirectoryPickerPurpose.MOVE -> fileOperationRepository.move(instanceId, srcDir, targetDir, names)
-                DirectoryPickerPurpose.COPY -> fileOperationRepository.copy(instanceId, srcDir, targetDir, names)
+                DirectoryPickerPurpose.MOVE ->
+                    fileOperationRepository.move(instanceId, picker.sourceDir, picker.currentPath, picker.sourceNames)
+                DirectoryPickerPurpose.COPY ->
+                    fileOperationRepository.copy(instanceId, picker.sourceDir, picker.currentPath, picker.sourceNames)
             }
             when (result) {
                 is ApiResult.Success -> {
                     val batch = result.data
-                    val message = if (batch.successCount > 0) {
-                        "${actionLabel}成功"
-                    } else {
-                        batch.failedItems.firstOrNull()?.reason ?: "${actionLabel}失败"
+                    val message = buildOperationResultMessage(batch.total, batch.successCount, batch.failedCount)
+                    _uiState.update {
+                        it.copy(
+                            directoryPicker = null,
+                            selectionMode = false,
+                            selectedPaths = emptySet(),
+                            snackbarMessage = message.text,
+                            snackbarIsError = message.isError,
+                            failureDetails = if (batch.failedItems.isNotEmpty()) batch.failedItems else null,
+                        )
                     }
-                    _uiState.update { it.copy(directoryPicker = null, snackbarMessage = message) }
                     if (batch.successCount > 0) refresh()
                 }
                 is ApiResult.Failure -> _uiState.update {
-                    it.copy(directoryPicker = null, snackbarMessage = result.error.toUserMessage())
+                    it.copy(directoryPicker = null, snackbarMessage = result.error.toUserMessage(), snackbarIsError = true)
                 }
             }
         }
