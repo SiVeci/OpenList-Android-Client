@@ -45,6 +45,8 @@ fun PreviewScreen(
         onBack = onBack,
         onRetry = { viewModel.resolvePreview() },
         onOpenMediaPlayer = onOpenMediaPlayer,
+        onLoadText = { forceRefresh -> viewModel.loadText(forceRefresh) },
+        onLoadMarkdown = { forceRefresh -> viewModel.loadMarkdown(forceRefresh) },
     )
 }
 
@@ -57,6 +59,8 @@ fun PreviewScaffold(
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onOpenMediaPlayer: (path: String) -> Unit,
+    onLoadText: (forceRefresh: Boolean) -> Unit = {},
+    onLoadMarkdown: (forceRefresh: Boolean) -> Unit = {},
 ) {
     val target = uiState.target
     Scaffold(
@@ -78,7 +82,10 @@ fun PreviewScaffold(
             else -> PreviewContentByOpenMode(
                 instanceId = instanceId,
                 target = target,
+                uiState = uiState,
                 onOpenMediaPlayer = onOpenMediaPlayer,
+                onLoadText = onLoadText,
+                onLoadMarkdown = onLoadMarkdown,
                 modifier = Modifier.padding(padding).fillMaxSize(),
             )
         }
@@ -86,11 +93,10 @@ fun PreviewScaffold(
 }
 
 /**
- * Branches on every [PreviewOpenMode] value. IN_APP_IMAGE is the only real
- * renderer this Sprint delivers (S2-T3); every other branch is a
- * non-crashing placeholder with clear copy, left in place for later sprints
- * to replace in-line:
- *  - IN_APP_TEXT / IN_APP_MARKDOWN -> S3.
+ * Branches on every [PreviewOpenMode] value. IN_APP_IMAGE/IN_APP_TEXT/
+ * IN_APP_MARKDOWN are the real renderers delivered so far (S2-T3, S3-T2,
+ * S3-T3); every other branch is a non-crashing placeholder with clear copy,
+ * left in place for later sprints to replace in-line:
  *  - IN_APP_VIDEO / IN_APP_AUDIO -> forwards to the player route (S5 builds
  *    the real player; the route itself is still S1's placeholder screen).
  *  - EXTERNAL_APP / DOWNLOAD / WEB / UNSUPPORTED -> S4 (ExternalOpenSheet).
@@ -99,7 +105,10 @@ fun PreviewScaffold(
 private fun PreviewContentByOpenMode(
     instanceId: String,
     target: PreviewTarget,
+    uiState: PreviewUiState,
     onOpenMediaPlayer: (path: String) -> Unit,
+    onLoadText: (forceRefresh: Boolean) -> Unit,
+    onLoadMarkdown: (forceRefresh: Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (target.openMode) {
@@ -121,17 +130,47 @@ private fun PreviewContentByOpenMode(
             }
         }
 
-        PreviewOpenMode.IN_APP_TEXT -> EmptyState(
-            title = "文本预览即将上线",
-            description = "本版本暂不支持在应用内查看，可下载后查看",
-            modifier = modifier,
-        )
+        PreviewOpenMode.IN_APP_TEXT -> {
+            LaunchedEffect(target.path) { onLoadText(false) }
+            when (val bodyState = uiState.textBodyState) {
+                is PreviewBodyState.Loading -> LoadingState(modifier = modifier)
+                is PreviewBodyState.Content -> TextPreviewSurface(content = bodyState.content, modifier = modifier)
+                is PreviewBodyState.Error -> if (bodyState.isTooLarge) {
+                    EmptyState(
+                        title = "文件过大，无法预览",
+                        description = "可下载后查看完整内容",
+                        modifier = modifier,
+                    )
+                } else {
+                    ErrorBar(
+                        message = bodyState.message,
+                        onRetry = { onLoadText(true) },
+                        modifier = modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        }
 
-        PreviewOpenMode.IN_APP_MARKDOWN -> EmptyState(
-            title = "Markdown 预览即将上线",
-            description = "本版本暂不支持在应用内查看，可下载后查看",
-            modifier = modifier,
-        )
+        PreviewOpenMode.IN_APP_MARKDOWN -> {
+            LaunchedEffect(target.path) { onLoadMarkdown(false) }
+            when (val bodyState = uiState.markdownBodyState) {
+                is PreviewBodyState.Loading -> LoadingState(modifier = modifier)
+                is PreviewBodyState.Content -> MarkdownPreviewSurface(content = bodyState.content, modifier = modifier)
+                is PreviewBodyState.Error -> if (bodyState.isTooLarge) {
+                    EmptyState(
+                        title = "文件过大，无法预览",
+                        description = "可下载后查看完整内容",
+                        modifier = modifier,
+                    )
+                } else {
+                    ErrorBar(
+                        message = bodyState.message,
+                        onRetry = { onLoadMarkdown(true) },
+                        modifier = modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        }
 
         PreviewOpenMode.IN_APP_VIDEO, PreviewOpenMode.IN_APP_AUDIO -> {
             // No UI of its own: forwards straight to the (still-placeholder)

@@ -7,6 +7,7 @@ import io.openlist.client.core.common.toUserMessage
 import io.openlist.client.core.database.dao.FileCacheDao
 import io.openlist.client.core.domain.FileOperationRepository
 import io.openlist.client.core.domain.InstanceRepository
+import io.openlist.client.core.domain.PreviewRepository
 import io.openlist.client.core.model.BatchOperationFailure
 import io.openlist.client.core.model.BatchOperationResult
 import io.openlist.client.core.network.InstanceContext
@@ -29,6 +30,12 @@ class FileOperationRepositoryImpl @Inject constructor(
     private val clientFactory: OpenListClientFactory,
     private val instanceContext: InstanceContext,
     private val sessionManager: SessionManager,
+    // v0.4_EXECUTION_PLAN.md §11 S3-T4: the first Repository-depends-on-Repository
+    // wiring in this codebase, deliberately scoped to this one side-effect (a
+    // successful write invalidating any stale preview_cache rows under the
+    // affected path) — not a precedent for coupling repositories' core read
+    // paths together elsewhere.
+    private val previewRepository: PreviewRepository,
 ) : FileOperationRepository {
 
     override suspend fun mkdir(instanceId: String, parentPath: String, name: String): ApiResult<Unit> {
@@ -50,6 +57,7 @@ class FileOperationRepositoryImpl @Inject constructor(
         if (result is ApiResult.Success) {
             fileCacheDao.clearDirectory(instanceId, OpenListPathCodec.parent(normalizedPath))
             fileCacheDao.deleteByPathPrefix(instanceId, normalizedPath)
+            previewRepository.invalidateByPrefix(instanceId, normalizedPath)
         }
         return result
     }
@@ -67,6 +75,7 @@ class FileOperationRepositoryImpl @Inject constructor(
                 is ApiResult.Success -> {
                     successCount++
                     fileCacheDao.deleteByPathPrefix(instanceId, itemPath)
+                    previewRepository.invalidateByPrefix(instanceId, itemPath)
                 }
                 is ApiResult.Failure -> {
                     failures += BatchOperationFailure(itemPath, result.error.toUserMessage())
@@ -106,6 +115,7 @@ class FileOperationRepositoryImpl @Inject constructor(
                 is ApiResult.Success -> {
                     successCount++
                     fileCacheDao.deleteByPathPrefix(instanceId, itemPath)
+                    previewRepository.invalidateByPrefix(instanceId, itemPath)
                 }
                 is ApiResult.Failure -> {
                     failures += BatchOperationFailure(itemPath, result.error.toUserMessage())
@@ -147,7 +157,9 @@ class FileOperationRepositoryImpl @Inject constructor(
             when (result) {
                 is ApiResult.Success -> {
                     successCount++
-                    fileCacheDao.deleteByPathPrefix(instanceId, OpenListPathCodec.child(normalizedTarget, name))
+                    val targetPath = OpenListPathCodec.child(normalizedTarget, name)
+                    fileCacheDao.deleteByPathPrefix(instanceId, targetPath)
+                    previewRepository.invalidateByPrefix(instanceId, targetPath)
                 }
                 is ApiResult.Failure -> {
                     failures += BatchOperationFailure(itemPath, result.error.toUserMessage())

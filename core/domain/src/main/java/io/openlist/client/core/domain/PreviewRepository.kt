@@ -21,9 +21,26 @@ interface PreviewRepository {
 
     suspend fun loadText(instanceId: String, path: String, options: TextPreviewOptions): ApiResult<TextPreviewContent>
 
-    suspend fun loadMarkdown(instanceId: String, path: String): ApiResult<MarkdownPreviewContent>
+    /** [forceRefresh] bypasses the `preview_cache` row, same meaning as
+     * [TextPreviewOptions.forceRefresh] — added in S3 (not part of the
+     * original S1 signature) so a "retry" action can bypass a stale cached
+     * body without a full [TextPreviewOptions]-shaped parameter. */
+    suspend fun loadMarkdown(instanceId: String, path: String, forceRefresh: Boolean = false): ApiResult<MarkdownPreviewContent>
 
     /** Re-resolves a fresh, non-expired URL for a target whose previously
      * resolved [PreviewTarget.source] URL has expired. */
     suspend fun refreshPreviewUrl(instanceId: String, path: String): ApiResult<PreviewUrl>
+
+    /** Drops the cached preview body (both the `preview_cache` row and its
+     * on-disk file) for exactly this (instanceId, path), across every kind.
+     * Internal cache-maintenance operation (S3-T4) — failures are swallowed,
+     * never surfaced as an [ApiResult], since callers invoke this as a
+     * best-effort side effect of a write operation succeeding, not as a
+     * user-facing action in its own right. */
+    suspend fun invalidate(instanceId: String, path: String)
+
+    /** Same as [invalidate] but for every cached preview under [pathPrefix]
+     * (the prefix path itself, plus anything nested under it) — used after
+     * rename/remove/move/copy on a directory. */
+    suspend fun invalidateByPrefix(instanceId: String, pathPrefix: String)
 }

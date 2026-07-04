@@ -8,6 +8,7 @@ import io.openlist.client.core.auth.SessionManager
 import io.openlist.client.core.common.ApiResult
 import io.openlist.client.core.database.dao.FileCacheDao
 import io.openlist.client.core.domain.InstanceRepository
+import io.openlist.client.core.domain.PreviewRepository
 import io.openlist.client.core.model.Instance
 import io.openlist.client.core.network.InstanceContext
 import io.openlist.client.core.network.OpenListApi
@@ -36,6 +37,7 @@ class FileOperationRepositoryImplTest {
     private val instanceRepository = mockk<InstanceRepository>()
     private val clientFactory = mockk<OpenListClientFactory>()
     private val sessionManager = mockk<SessionManager>(relaxed = true)
+    private val previewRepository = mockk<PreviewRepository>(relaxed = true)
 
     private lateinit var repository: FileOperationRepositoryImpl
 
@@ -59,6 +61,7 @@ class FileOperationRepositoryImplTest {
             clientFactory = clientFactory,
             instanceContext = InstanceContext(),
             sessionManager = sessionManager,
+            previewRepository = previewRepository,
         )
     }
 
@@ -72,6 +75,20 @@ class FileOperationRepositoryImplTest {
         assertEquals(2, batch.successCount)
         assertEquals(0, batch.failedCount)
         assertEquals(emptyList<Any>(), batch.failedItems)
+        // S3-T4: each successfully removed item's own preview cache subtree
+        // must be invalidated too, not just the directory listing cache.
+        coVerify { previewRepository.invalidateByPrefix(INSTANCE_ID, "/docs/a.txt") }
+        coVerify { previewRepository.invalidateByPrefix(INSTANCE_ID, "/docs/b.txt") }
+    }
+
+    @Test
+    fun `rename invalidates the preview cache subtree under the old path`() = runTest {
+        coEvery { api.fsRename(any()) } returns success()
+
+        repository.rename(INSTANCE_ID, "/docs/old.txt", "new.txt")
+
+        coVerify { fileCacheDao.deleteByPathPrefix(INSTANCE_ID, "/docs/old.txt") }
+        coVerify { previewRepository.invalidateByPrefix(INSTANCE_ID, "/docs/old.txt") }
     }
 
     @Test
@@ -125,6 +142,10 @@ class FileOperationRepositoryImplTest {
         assertEquals(1, batch.failedCount)
         coVerify { fileCacheDao.clearDirectory(INSTANCE_ID, "/src") }
         coVerify { fileCacheDao.clearDirectory(INSTANCE_ID, "/dst") }
+        // S3-T4: only the one item that actually succeeded (a.txt, at its
+        // source path) should have its preview cache invalidated.
+        coVerify { previewRepository.invalidateByPrefix(INSTANCE_ID, "/src/a.txt") }
+        coVerify(exactly = 0) { previewRepository.invalidateByPrefix(INSTANCE_ID, "/src/b.txt") }
     }
 
     @Test
@@ -136,6 +157,10 @@ class FileOperationRepositoryImplTest {
         assertEquals(1, batch.successCount)
         coVerify { fileCacheDao.clearDirectory(INSTANCE_ID, "/dst") }
         coVerify(exactly = 0) { fileCacheDao.clearDirectory(INSTANCE_ID, "/src") }
+        // S3-T4: copy invalidates the *target* path's preview cache (a
+        // pre-existing same-name file there may have had its own cached
+        // preview, which the copy just overwrote), not the source's.
+        coVerify { previewRepository.invalidateByPrefix(INSTANCE_ID, "/dst/a.txt") }
     }
 
     private fun success() = ApiResponse<JsonElement?>(code = 200, message = "success", data = null)

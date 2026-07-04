@@ -13,6 +13,7 @@ import io.openlist.client.core.database.dao.FileCacheDao
 import io.openlist.client.core.database.dao.UploadTaskDao
 import io.openlist.client.core.database.entity.UploadTaskStatus
 import io.openlist.client.core.domain.InstanceRepository
+import io.openlist.client.core.domain.PreviewRepository
 import io.openlist.client.core.network.OpenListPathCodec
 import io.openlist.client.core.network.ProgressRequestBody
 import io.openlist.client.core.network.UploadHttpClient
@@ -47,6 +48,7 @@ class UploadWorker @AssistedInject constructor(
     private val fileCacheDao: FileCacheDao,
     private val sessionManager: SessionManager,
     private val json: Json,
+    private val previewRepository: PreviewRepository,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -99,6 +101,11 @@ class UploadWorker @AssistedInject constructor(
                 if (response.isSuccessful) {
                     uploadTaskDao.updateProgress(taskId, UploadTaskStatus.SUCCESS, task.totalBytes ?: 0L, null, System.currentTimeMillis())
                     fileCacheDao.clearDirectory(task.instanceId, task.targetDir)
+                    // v0.4_EXECUTION_PLAN.md §11 S3-T4: an upload that overwrites
+                    // an existing file must also drop that file's own stale
+                    // preview_cache row/body — a single-file invalidate, not a
+                    // subtree one, since only this exact path changed.
+                    previewRepository.invalidate(task.instanceId, OpenListPathCodec.child(task.targetDir, task.fileName))
                     Result.success()
                 } else {
                     // Matches every other write path (FileOperationRepositoryImpl):
