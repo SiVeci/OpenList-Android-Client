@@ -226,7 +226,7 @@ class SubtitleRepositoryImplTest {
 
     private fun success(data: FsGetResp) = io.openlist.client.core.network.dto.ApiResponse(code = 200, message = "success", data = data)
 
-    private fun failure(code: Int, message: String) = io.openlist.client.core.network.dto.ApiResponse<FsGetResp?>(code = code, message = message, data = null)
+    private fun failure(code: Int, message: String) = io.openlist.client.core.network.dto.ApiResponse<FsGetResp>(code = code, message = message, data = null)
 
     private companion object {
         const val INSTANCE_ID = "inst-1"

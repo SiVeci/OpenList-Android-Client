@@ -186,7 +186,7 @@ class ExternalOpenRepositoryImplTest {
 
     private fun success(data: FsGetResp) = ApiResponse(code = 200, message = "success", data = data)
 
-    private fun failure(code: Int, message: String) = ApiResponse<FsGetResp?>(code = code, message = message, data = null)
+    private fun failure(code: Int, message: String) = ApiResponse<FsGetResp>(code = code, message = message, data = null)
 
     /** Trivial fake standing in for [AndroidMimeTypeResolver] — the real
      * implementation calls `android.webkit.MimeTypeMap.getSingleton()`,

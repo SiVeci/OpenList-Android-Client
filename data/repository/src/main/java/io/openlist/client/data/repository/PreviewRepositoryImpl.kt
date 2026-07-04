@@ -244,10 +244,11 @@ class PreviewRepositoryImpl @Inject constructor(
         val freshModified = parseTimestamp(fresh.modified)
         return previewCacheDao.getByInstanceAndPath(instanceId, path)
             .firstOrNull { row ->
+                val expiresAt = row.expiresAt
                 row.kind == kind &&
                     row.lastModified == freshModified &&
                     row.sizeBytes == fresh.size &&
-                    (row.expiresAt == null || row.expiresAt > now)
+                    (expiresAt == null || expiresAt > now)
             }
     }
 
@@ -258,7 +259,7 @@ class PreviewRepositoryImpl @Inject constructor(
      * stored verbatim in [PreviewCacheEntity.cacheKey] so the two stay
      * trivially derivable from each other (the digest exists only because a
      * raw OpenList path contains '/' and can't be a single file name). */
-    private fun persistCacheBody(instanceId: String, path: String, kind: String, bytes: ByteArray, fresh: FsGetResp) {
+    private suspend fun persistCacheBody(instanceId: String, path: String, kind: String, bytes: ByteArray, fresh: FsGetResp) {
         runCatching {
             val cacheKey = "$instanceId:$path:$kind"
             val fileName = sha256Hex(cacheKey)

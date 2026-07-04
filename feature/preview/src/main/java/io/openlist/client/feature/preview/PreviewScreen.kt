@@ -239,6 +239,7 @@ private fun PreviewContentByOpenMode(
  * stays pure UI) since that's this screen's job per the unified-dispatch
  * architecture.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ExternalOpenFallback(
     target: PreviewTarget,

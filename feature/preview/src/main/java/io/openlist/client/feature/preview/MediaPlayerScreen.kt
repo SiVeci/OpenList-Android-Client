@@ -168,6 +168,7 @@ private fun MediaPlayerScaffold(
  * fallback via [ExternalOpenSheet], reusing the exact UX shape
  * [PreviewScreen]'s `ExternalOpenFallback` already established for S4.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MediaPlayerErrorContent(
     uiState: MediaPlayerUiState,

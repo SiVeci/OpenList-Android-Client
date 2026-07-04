@@ -32,6 +32,13 @@ android {
     buildFeatures {
         compose = true
     }
+
+    testOptions {
+        // MediaPlaybackErrorClassifierTest constructs real Media3
+        // PlaybackException instances, whose constructor touches
+        // android.os.SystemClock — return 0 instead of throwing.
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
@@ -39,6 +46,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:domain"))
     implementation(project(":core:designsystem"))
+    implementation(project(":core:network"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
