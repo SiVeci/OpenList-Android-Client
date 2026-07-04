@@ -36,18 +36,6 @@ import kotlinx.coroutines.launch
 import java.net.URLDecoder
 import javax.inject.Inject
 
-/** Kinds that route to the v0.4 in-app preview screen instead of the file
- * detail screen when tapped (v0.4_EXECUTION_PLAN.md §11 S2-T4). PDF/OFFICE/
- * UNKNOWN deliberately stay out of this set — P-404 keeps them on the
- * pre-v0.4 detail-screen path until S4 gives them a real handler. */
-internal val PREVIEWABLE_KINDS = setOf(
-    PreviewKind.IMAGE,
-    PreviewKind.VIDEO,
-    PreviewKind.AUDIO,
-    PreviewKind.TEXT,
-    PreviewKind.MARKDOWN,
-)
-
 /** A single file/directory's write-action menu and the mkdir/rename/delete
  * dialogs it opens (v0.2_EXECUTION_PLAN.md §13.3/§13.4/§13.5). */
 sealed class FileListDialog {
@@ -205,7 +193,7 @@ class FileListViewModel @Inject constructor(
             toggleSelection(node)
         } else if (node.isDir) {
             navigateTo(node.path)
-        } else if (PreviewKindResolver.resolve(node.name) in PREVIEWABLE_KINDS) {
+        } else if (PreviewKindResolver.isInAppPreviewable(PreviewKindResolver.resolve(node.name))) {
             onOpenFile(node.path)
         } else {
             onOpenFileDetail(node.path)

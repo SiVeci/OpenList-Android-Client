@@ -34,6 +34,7 @@ import io.openlist.client.core.designsystem.components.ErrorBar
 import io.openlist.client.core.designsystem.components.ListRowItem
 import io.openlist.client.core.designsystem.components.LoadingState
 import io.openlist.client.core.designsystem.components.SearchBar
+import io.openlist.client.core.model.PreviewKindResolver
 import io.openlist.client.core.model.SearchHistoryItem
 import io.openlist.client.core.model.SearchResultItem
 
@@ -42,6 +43,7 @@ import io.openlist.client.core.model.SearchResultItem
 fun SearchScreen(
     onBack: () -> Unit,
     onOpenDirectory: (path: String) -> Unit,
+    onOpenFile: (path: String) -> Unit,
     onOpenFileDetail: (path: String) -> Unit,
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
@@ -111,7 +113,17 @@ fun SearchScreen(
                                 sizeText = if (result.isDir) null else formatSize(result.size),
                                 modifiedText = result.path,
                                 onClick = {
-                                    if (result.isDir) onOpenDirectory(result.path) else onOpenFileDetail(result.path)
+                                    // P-405: a previewable file goes straight to the v0.4
+                                    // in-app preview route, same decision FileListViewModel
+                                    // makes for an ordinary directory listing row (S6-T3
+                                    // reuses PreviewKindResolver.isInAppPreviewable so both
+                                    // entry points agree on exactly the same kind set).
+                                    when {
+                                        result.isDir -> onOpenDirectory(result.path)
+                                        PreviewKindResolver.isInAppPreviewable(PreviewKindResolver.resolve(result.name)) ->
+                                            onOpenFile(result.path)
+                                        else -> onOpenFileDetail(result.path)
+                                    }
                                 },
                             )
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)

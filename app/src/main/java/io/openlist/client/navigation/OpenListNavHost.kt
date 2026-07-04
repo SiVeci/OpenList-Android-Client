@@ -89,14 +89,24 @@ fun OpenListNavHost(navController: NavHostController = rememberNavController()) 
                 onOpenShareDetail = { shareId -> navController.navigate(Routes.shareDetail(instanceId, shareId)) },
             )
         }
-        composable(Routes.SHARE_DETAIL) {
-            ShareDetailScreen(onBack = { navController.popBackStack() })
+        composable(Routes.SHARE_DETAIL) { backStackEntry ->
+            val instanceId = backStackEntry.arguments?.getString("instanceId") ?: return@composable
+            ShareDetailScreen(
+                onBack = { navController.popBackStack() },
+                // Ordinary Routes.fileList browsing (the share creator's own
+                // normal permissions), not any share-mode/guest-scoped
+                // directory view -- see ShareDetailScreen's KDoc.
+                onOpenDirectory = { path -> navController.navigate(Routes.fileList(instanceId, path)) },
+                onOpenFile = { path -> navController.navigate(Routes.preview(instanceId, path)) },
+                onOpenFileDetail = { path -> navController.navigate(Routes.fileDetail(instanceId, path)) },
+            )
         }
         composable(Routes.SEARCH) { backStackEntry ->
             val instanceId = backStackEntry.arguments?.getString("instanceId") ?: return@composable
             SearchScreen(
                 onBack = { navController.popBackStack() },
                 onOpenDirectory = { path -> navController.navigate(Routes.fileList(instanceId, path)) },
+                onOpenFile = { path -> navController.navigate(Routes.preview(instanceId, path)) },
                 onOpenFileDetail = { path -> navController.navigate(Routes.fileDetail(instanceId, path)) },
             )
         }
@@ -105,6 +115,7 @@ fun OpenListNavHost(navController: NavHostController = rememberNavController()) 
             TaskCenterScreen(
                 onBack = { navController.popBackStack() },
                 onOpenDirectory = { path -> navController.navigate(Routes.fileList(instanceId, path)) },
+                onOpenFile = { path -> navController.navigate(Routes.preview(instanceId, path)) },
             )
         }
         composable(Routes.PREVIEW) { backStackEntry ->

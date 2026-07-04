@@ -9,6 +9,7 @@ import io.openlist.client.core.common.toUserMessage
 import io.openlist.client.core.designsystem.components.ExpiryOption
 import io.openlist.client.core.designsystem.components.expiryOptionFor
 import io.openlist.client.core.designsystem.components.toEpochMillis
+import io.openlist.client.core.domain.FilesRepository
 import io.openlist.client.core.domain.InstanceRepository
 import io.openlist.client.core.domain.ShareRepository
 import io.openlist.client.core.model.Share
@@ -30,6 +31,20 @@ data class ShareEditState(
     val errorMessage: String? = null,
 )
 
+/**
+ * One row of the "分享文件" list (S6-T3, P-406) — the resolved projection of
+ * one `Share.paths` entry. [loadError] means [FilesRepository.getFile] failed
+ * for this specific path (e.g. it was since moved/deleted); the row still
+ * renders (with an error message, not clickable) rather than disappearing or
+ * failing the whole screen load, per V-405's documented fallback copy.
+ */
+data class ShareFileEntry(
+    val path: String,
+    val name: String,
+    val isDir: Boolean,
+    val loadError: Boolean = false,
+)
+
 data class ShareDetailUiState(
     val isLoading: Boolean = true,
     val share: Share? = null,
@@ -41,6 +56,9 @@ data class ShareDetailUiState(
     val editSheet: ShareEditState? = null,
     val snackbarMessage: String? = null,
     val deleted: Boolean = false,
+    /** Resolved [Share.paths] entries (S6-T3) -- populated alongside [share],
+     * independently of it succeeding/failing per-row (see [ShareFileEntry]). */
+    val fileEntries: List<ShareFileEntry> = emptyList(),
 )
 
 @HiltViewModel
@@ -48,6 +66,7 @@ class ShareDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val shareRepository: ShareRepository,
     private val instanceRepository: InstanceRepository,
+    private val filesRepository: FilesRepository,
 ) : ViewModel() {
 
     private val instanceId: String = checkNotNull(savedStateHandle["instanceId"])
@@ -65,17 +84,52 @@ class ShareDetailViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             val instance = instanceRepository.getById(instanceId)
             when (val result = shareRepository.getShare(instanceId, shareId)) {
-                is ApiResult.Success -> _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        share = result.data,
-                        shareUrl = instance?.let { i -> shareRepository.buildShareUrl(i.baseUrl, shareId) },
-                    )
+                is ApiResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            share = result.data,
+                            shareUrl = instance?.let { i -> shareRepository.buildShareUrl(i.baseUrl, shareId) },
+                        )
+                    }
+                    loadFileEntries(result.data.paths)
                 }
                 is ApiResult.Failure -> _uiState.update {
                     it.copy(isLoading = false, errorMessage = result.error.toUserMessage())
                 }
             }
+        }
+    }
+
+    /**
+     * P-406/V-405: resolves each of the share's own [Share.paths] via
+     * [FilesRepository.getFile] using the *creator's own normal permissions*
+     * -- this is plain `fs/get`, the exact same call [FileListViewModel]/
+     * [io.openlist.client.feature.files.FileDetailScreen] already make for
+     * ordinary browsing, not any shared-link/guest-scoped request. A handful
+     * of paths per share (V-405's documented assumption), so no pagination/
+     * batching is needed -- sequential awaits keep this simple. A failed
+     * lookup becomes a [ShareFileEntry.loadError] row rather than failing the
+     * whole list (a since-moved/deleted path must not blank the rest).
+     */
+    private fun loadFileEntries(paths: List<String>) {
+        viewModelScope.launch {
+            val entries = paths.map { path ->
+                when (val result = filesRepository.getFile(instanceId, path)) {
+                    is ApiResult.Success -> ShareFileEntry(
+                        path = path,
+                        name = result.data.name,
+                        isDir = result.data.isDir,
+                    )
+                    is ApiResult.Failure -> ShareFileEntry(
+                        path = path,
+                        name = path.substringAfterLast('/').ifBlank { path },
+                        isDir = false,
+                        loadError = true,
+                    )
+                }
+            }
+            _uiState.update { it.copy(fileEntries = entries) }
         }
     }
 

@@ -86,4 +86,22 @@ class PreviewKindResolverTest {
         assertEquals(PreviewKind.VIDEO, PreviewKindResolver.resolve("MOVIE.MP4"))
         assertEquals(PreviewKind.MARKDOWN, PreviewKindResolver.resolve("README.MD"))
     }
+
+    // ---- isInAppPreviewable (promoted from :feature:files's PREVIEWABLE_KINDS, S6-T3) ----
+
+    @Test
+    fun `IMAGE VIDEO AUDIO TEXT and MARKDOWN are in-app previewable`() {
+        assertEquals(true, PreviewKindResolver.isInAppPreviewable(PreviewKind.IMAGE))
+        assertEquals(true, PreviewKindResolver.isInAppPreviewable(PreviewKind.VIDEO))
+        assertEquals(true, PreviewKindResolver.isInAppPreviewable(PreviewKind.AUDIO))
+        assertEquals(true, PreviewKindResolver.isInAppPreviewable(PreviewKind.TEXT))
+        assertEquals(true, PreviewKindResolver.isInAppPreviewable(PreviewKind.MARKDOWN))
+    }
+
+    @Test
+    fun `PDF OFFICE and UNKNOWN are not in-app previewable, P-404`() {
+        assertEquals(false, PreviewKindResolver.isInAppPreviewable(PreviewKind.PDF))
+        assertEquals(false, PreviewKindResolver.isInAppPreviewable(PreviewKind.OFFICE))
+        assertEquals(false, PreviewKindResolver.isInAppPreviewable(PreviewKind.UNKNOWN))
+    }
 }

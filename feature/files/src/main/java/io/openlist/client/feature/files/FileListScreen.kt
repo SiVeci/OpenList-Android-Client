@@ -390,7 +390,7 @@ private fun buildFileActions(
     if (!node.isDir) {
         add(FileActionItem(label = "下载", icon = Icons.Outlined.Download, onClick = onOpenDetail))
     }
-    if (!node.isDir && PreviewKindResolver.resolve(node.name) in PREVIEWABLE_KINDS) {
+    if (!node.isDir && PreviewKindResolver.isInAppPreviewable(PreviewKindResolver.resolve(node.name))) {
         add(FileActionItem(label = "预览", icon = Icons.Filled.Visibility, onClick = onOpenFile))
     }
     add(FileActionItem(label = "详情", icon = Icons.Filled.Info, onClick = onOpenDetail))

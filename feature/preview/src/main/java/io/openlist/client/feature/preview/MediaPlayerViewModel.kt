@@ -8,13 +8,19 @@ import io.openlist.client.core.common.ApiResult
 import io.openlist.client.core.common.DomainError
 import io.openlist.client.core.common.toUserMessage
 import io.openlist.client.core.domain.ExternalOpenRepository
+import io.openlist.client.core.domain.FileListResult
 import io.openlist.client.core.domain.FilesRepository
 import io.openlist.client.core.domain.MediaRepository
+import io.openlist.client.core.domain.SubtitleRepository
 import io.openlist.client.core.domain.TransferRepository
 import io.openlist.client.core.model.ExternalOpenTarget
+import io.openlist.client.core.model.FileNode
 import io.openlist.client.core.model.MediaSource
 import io.openlist.client.core.model.PreviewKind
 import io.openlist.client.core.model.PreviewKindResolver
+import io.openlist.client.core.model.SubtitleCandidate
+import io.openlist.client.core.model.SubtitleSource
+import io.openlist.client.core.network.OpenListPathCodec
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -61,6 +67,19 @@ data class MediaPlayerUiState(
     val externalOpenError: String? = null,
     val showExternalOpenSheet: Boolean = false,
     val downloadState: PreviewDownloadState = PreviewDownloadState.Idle,
+    /** Auto-discovered subtitle candidates for the current [mediaSource]
+     * (S6-T2, only ever populated for [PreviewKind.VIDEO]) -- a lookup
+     * failure here just leaves this empty, it never touches [errorMessage]
+     * or [mediaSource] (subtitles are a strictly additive, best-effort
+     * feature; playback itself must never be blocked by it). */
+    val subtitleCandidates: List<SubtitleCandidate> = emptyList(),
+    /** Currently-applied subtitle track, or null for "no subtitles" (the
+     * default, and also what "关闭字幕" in [SubtitleSelector] sets). */
+    val selectedSubtitle: SubtitleSource? = null,
+    val showSubtitleSelector: Boolean = false,
+    /** Best-effort error surfaced by [selectSubtitle]/[selectManualSubtitle]
+     * -- shown as a transient message by the caller, never blocks playback. */
+    val subtitleError: String? = null,
 )
 
 @HiltViewModel
@@ -70,6 +89,7 @@ class MediaPlayerViewModel @Inject constructor(
     private val externalOpenRepository: ExternalOpenRepository,
     private val filesRepository: FilesRepository,
     private val transferRepository: TransferRepository,
+    private val subtitleRepository: SubtitleRepository,
 ) : ViewModel() {
 
     private val instanceId: String = checkNotNull(savedStateHandle["instanceId"])
@@ -89,20 +109,30 @@ class MediaPlayerViewModel @Inject constructor(
      * user-facing "retry" affordance on a resolve failure. */
     fun resolveMedia() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null, isMediaUnsupported = false) }
+            _uiState.update {
+                it.copy(
+                    isLoading = true,
+                    errorMessage = null,
+                    isMediaUnsupported = false,
+                    subtitleCandidates = emptyList(),
+                    selectedSubtitle = null,
+                )
+            }
             when (val result = mediaRepository.resolveMedia(instanceId, path)) {
                 is ApiResult.Success -> {
+                    val kind = PreviewKindResolver.resolve(result.data.title)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
                             mediaSource = result.data,
-                            kind = PreviewKindResolver.resolve(result.data.title),
+                            kind = kind,
                             errorMessage = null,
                             isMediaUnsupported = false,
                             sourceRevision = it.sourceRevision + 1,
                             scopedHeaders = result.data.headers,
                         )
                     }
+                    if (kind == PreviewKind.VIDEO) loadSubtitleCandidates()
                 }
                 is ApiResult.Failure -> _uiState.update {
                     it.copy(
@@ -112,6 +142,87 @@ class MediaPlayerViewModel @Inject constructor(
                         isMediaUnsupported = result.error == DomainError.MediaUnsupported,
                     )
                 }
+            }
+        }
+    }
+
+    /**
+     * S6-T2: best-effort subtitle-candidate discovery, only ever triggered
+     * for [PreviewKind.VIDEO] (see [resolveMedia]). A failure here is
+     * deliberately swallowed into an empty list rather than surfaced via
+     * [MediaPlayerUiState.errorMessage] -- per the Sprint's hard requirement,
+     * subtitle discovery must never block or otherwise affect main playback.
+     */
+    private fun loadSubtitleCandidates() {
+        viewModelScope.launch {
+            when (val result = subtitleRepository.findCandidates(instanceId, path)) {
+                is ApiResult.Success -> _uiState.update { it.copy(subtitleCandidates = result.data) }
+                is ApiResult.Failure -> _uiState.update { it.copy(subtitleCandidates = emptyList()) }
+            }
+        }
+    }
+
+    fun openSubtitleSelector() {
+        _uiState.update { it.copy(showSubtitleSelector = true) }
+    }
+
+    fun dismissSubtitleSelector() {
+        _uiState.update { it.copy(showSubtitleSelector = false) }
+    }
+
+    /** Resolves an auto-discovered candidate into a loadable [SubtitleSource]
+     * and applies it. Same "never block playback" rule as
+     * [loadSubtitleCandidates]: a resolve failure only sets [MediaPlayerUiState.subtitleError],
+     * it leaves [MediaPlayerUiState.mediaSource] and [MediaPlayerUiState.errorMessage] untouched. */
+    fun selectSubtitle(candidate: SubtitleCandidate) {
+        viewModelScope.launch {
+            when (val result = subtitleRepository.resolveSubtitle(instanceId, candidate.path)) {
+                is ApiResult.Success -> _uiState.update {
+                    it.copy(selectedSubtitle = result.data, showSubtitleSelector = false, subtitleError = null)
+                }
+                is ApiResult.Failure -> _uiState.update {
+                    it.copy(subtitleError = result.error.toUserMessage())
+                }
+            }
+        }
+    }
+
+    /** "从当前目录选择" path (S6-T2): the user picked an arbitrary file from
+     * the video's own directory, not necessarily one [subtitleCandidates]
+     * recognized by extension -- resolved the exact same way regardless. */
+    fun selectManualSubtitle(subtitlePath: String) {
+        viewModelScope.launch {
+            when (val result = subtitleRepository.resolveSubtitle(instanceId, subtitlePath)) {
+                is ApiResult.Success -> _uiState.update {
+                    it.copy(selectedSubtitle = result.data, showSubtitleSelector = false, subtitleError = null)
+                }
+                is ApiResult.Failure -> _uiState.update {
+                    it.copy(subtitleError = result.error.toUserMessage())
+                }
+            }
+        }
+    }
+
+    fun clearSubtitle() {
+        _uiState.update { it.copy(selectedSubtitle = null, showSubtitleSelector = false) }
+    }
+
+    /** Backs the "从当前目录选择" expandable entry inside [SubtitleSelector]:
+     * lists the video's own parent directory (reusing [FilesRepository],
+     * already injected for [download]) so the user can pick literally any
+     * file in it, not just ones [subtitleCandidates] already flagged as
+     * subtitle-shaped. Collects only the first (cache-or-fresh) emission --
+     * good enough for a one-shot picker list, no need to keep observing. */
+    fun loadDirectoryEntriesForManualSubtitle(onLoaded: (List<FileNode>) -> Unit) {
+        viewModelScope.launch {
+            val parentDir = OpenListPathCodec.parent(path)
+            filesRepository.listDirectory(instanceId, parentDir).collect { result ->
+                val nodes = when (result) {
+                    is FileListResult.Cached -> result.nodes
+                    is FileListResult.Fresh -> result.nodes
+                    is FileListResult.Error -> result.staleCache
+                }
+                if (nodes != null) onLoaded(nodes.filterNot { it.isDir })
             }
         }
     }

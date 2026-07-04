@@ -52,4 +52,27 @@ object PreviewKindResolver {
             else -> PreviewKind.UNKNOWN
         }
     }
+
+    /** Kinds that route to the v0.4 in-app preview screen instead of a plain
+     * file-detail/download screen when tapped (v0.4_EXECUTION_PLAN.md §11
+     * S2-T4, P-404). PDF/OFFICE/UNKNOWN deliberately return false here — they
+     * stay on the pre-v0.4 detail-screen path until a real in-app handler
+     * exists for them.
+     *
+     * Promoted (S6-T3) from a `:feature:files`-only `PREVIEWABLE_KINDS` set
+     * so every entry point that needs this same decision (file list, search
+     * results, share detail, ...) shares one authoritative definition instead
+     * of each feature module re-declaring its own copy — `:feature:search`/
+     * `:feature:share` have no dependency on `:feature:files` to reuse its
+     * previously-private constant, but all of them already depend on
+     * `:core:model`. */
+    fun isInAppPreviewable(kind: PreviewKind): Boolean = kind in IN_APP_PREVIEWABLE_KINDS
+
+    private val IN_APP_PREVIEWABLE_KINDS = setOf(
+        PreviewKind.IMAGE,
+        PreviewKind.VIDEO,
+        PreviewKind.AUDIO,
+        PreviewKind.TEXT,
+        PreviewKind.MARKDOWN,
+    )
 }

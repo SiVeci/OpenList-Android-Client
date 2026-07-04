@@ -9,6 +9,7 @@ import io.openlist.client.core.common.toUserMessage
 import io.openlist.client.core.designsystem.components.DirectoryPickerContent
 import io.openlist.client.core.designsystem.components.DirectoryPickerEntry
 import io.openlist.client.core.domain.DirectoryPickerRepository
+import io.openlist.client.core.domain.FilesRepository
 import io.openlist.client.core.domain.OfflineDownloadRepository
 import io.openlist.client.core.domain.TaskAggregationRepository
 import io.openlist.client.core.model.TaskSource
@@ -72,6 +73,7 @@ class TaskCenterViewModel @Inject constructor(
     private val taskAggregationRepository: TaskAggregationRepository,
     private val offlineDownloadRepository: OfflineDownloadRepository,
     private val directoryPickerRepository: DirectoryPickerRepository,
+    private val filesRepository: FilesRepository,
 ) : ViewModel() {
 
     private val instanceId: String = checkNotNull(savedStateHandle["instanceId"])
@@ -144,6 +146,48 @@ class TaskCenterViewModel @Inject constructor(
 
     fun dismissSnackbar() {
         _uiState.update { it.copy(snackbarMessage = null) }
+    }
+
+    // --- Open target (S6-T4, P-407) --------------------------------------------
+
+    /**
+     * "跳转目录"/row-tap entry point for a completed task with a known
+     * [UnifiedTask.path]. B-405: pre-S6 code unconditionally treated every
+     * `path` as a directory; this resolves it via [FilesRepository.getFile]
+     * (creator/owner's own normal permissions, same call every other v0.4
+     * entry point already makes) and only *then* decides directory vs. file.
+     *
+     * Directory -> [onOpenDirectory], unchanged from the pre-S6 behavior
+     * (zero regression for the existing "SUCCESS task with a path always
+     * opened its folder" case).
+     *
+     * Non-directory file -> **always** [onOpenFile], regardless of
+     * [io.openlist.client.core.model.PreviewKindResolver.isInAppPreviewable].
+     * This is a deliberate v0.4 "统一分发" (unified dispatch) choice: the
+     * task center has no "file detail" concept/route of its own to fall back
+     * to, and [io.openlist.client.feature.preview.PreviewScreen] already
+     * handles PDF/OFFICE/UNKNOWN itself via EXTERNAL_APP/UNSUPPORTED +
+     * download/external-open fallbacks (S4). Routing every non-directory
+     * task target through the one preview entry point avoids adding a
+     * task-center-specific "file detail" special case that would duplicate
+     * that fallback logic for no benefit.
+     *
+     * A [ApiResult.Failure] (the path was moved/deleted, etc.) surfaces via
+     * the existing [TaskCenterUiState.snackbarMessage] mechanism and leaves
+     * the user on the task center -- no navigation happens.
+     */
+    fun openTaskTarget(task: UnifiedTask, onOpenDirectory: (String) -> Unit, onOpenFile: (String) -> Unit) {
+        val path = task.path ?: return
+        viewModelScope.launch {
+            when (val result = filesRepository.getFile(instanceId, path)) {
+                is ApiResult.Success -> {
+                    if (result.data.isDir) onOpenDirectory(path) else onOpenFile(path)
+                }
+                is ApiResult.Failure -> _uiState.update {
+                    it.copy(snackbarMessage = "无法打开，文件可能已被移动或删除")
+                }
+            }
+        }
     }
 
     // --- Offline download (v0.3_EXECUTION_PLAN.md §17) ------------------------

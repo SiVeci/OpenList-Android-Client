@@ -8,6 +8,7 @@ import io.openlist.client.core.common.DomainError
 import io.openlist.client.core.domain.ExternalOpenRepository
 import io.openlist.client.core.domain.FilesRepository
 import io.openlist.client.core.domain.MediaRepository
+import io.openlist.client.core.domain.SubtitleRepository
 import io.openlist.client.core.domain.TransferRepository
 import io.openlist.client.core.model.MediaSource
 import kotlinx.coroutines.Dispatchers
@@ -40,12 +41,19 @@ class MediaPlayerViewModelTest {
     private val externalOpenRepository = mockk<ExternalOpenRepository>(relaxed = true)
     private val filesRepository = mockk<FilesRepository>(relaxed = true)
     private val transferRepository = mockk<TransferRepository>(relaxed = true)
+    private val subtitleRepository = mockk<SubtitleRepository>(relaxed = true)
 
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        // mediaSource(...) below always resolves to PreviewKind.VIDEO (a
+        // "movie.mp4" title), so resolveMedia() always triggers a
+        // findCandidates call (S6-T2) -- stubbed explicitly here (rather than
+        // relying on the relaxed mock's default) so every existing test's
+        // behavior stays exactly as before this Sprint's subtitle wiring.
+        coEvery { subtitleRepository.findCandidates(any(), any()) } returns ApiResult.Success(emptyList())
     }
 
     @After
@@ -61,6 +69,7 @@ class MediaPlayerViewModelTest {
             externalOpenRepository = externalOpenRepository,
             filesRepository = filesRepository,
             transferRepository = transferRepository,
+            subtitleRepository = subtitleRepository,
         )
     }
 
@@ -137,6 +146,105 @@ class MediaPlayerViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(mapOf("Authorization" to "token-xyz"), viewModel.uiState.value.scopedHeaders)
+    }
+
+    // ---- Subtitles (S6-T2) ----
+
+    @Test
+    fun `resolving a VIDEO source triggers subtitle candidate discovery`() = runTest {
+        coEvery { mediaRepository.resolveMedia(INSTANCE_ID, PATH) } returns ApiResult.Success(mediaSource("sign1"))
+        val candidate = io.openlist.client.core.model.SubtitleCandidate(
+            path = "/movie.srt",
+            name = "movie.srt",
+            language = null,
+            format = "srt",
+            source = io.openlist.client.core.model.SubtitleSourceType.AUTO_DISCOVERED,
+        )
+        coEvery { subtitleRepository.findCandidates(INSTANCE_ID, PATH) } returns ApiResult.Success(listOf(candidate))
+
+        val viewModel = buildViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(listOf(candidate), viewModel.uiState.value.subtitleCandidates)
+    }
+
+    @Test
+    fun `a subtitle candidate lookup failure leaves candidates empty without touching mediaSource or errorMessage`() = runTest {
+        coEvery { mediaRepository.resolveMedia(INSTANCE_ID, PATH) } returns ApiResult.Success(mediaSource("sign1"))
+        coEvery { subtitleRepository.findCandidates(INSTANCE_ID, PATH) } returns ApiResult.Failure(DomainError.NetworkUnavailable)
+
+        val viewModel = buildViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(emptyList<Any>(), viewModel.uiState.value.subtitleCandidates)
+        assertNotNull(viewModel.uiState.value.mediaSource)
+        assertNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun `selectSubtitle resolves and applies the candidate, closing the selector`() = runTest {
+        coEvery { mediaRepository.resolveMedia(INSTANCE_ID, PATH) } returns ApiResult.Success(mediaSource("sign1"))
+        val viewModel = buildViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.openSubtitleSelector()
+
+        val candidate = io.openlist.client.core.model.SubtitleCandidate(
+            path = "/movie.srt",
+            name = "movie.srt",
+            language = null,
+            format = "srt",
+            source = io.openlist.client.core.model.SubtitleSourceType.AUTO_DISCOVERED,
+        )
+        val resolved = io.openlist.client.core.model.SubtitleSource(path = "/movie.srt", url = "https://example.com/d/movie.srt", format = "srt")
+        coEvery { subtitleRepository.resolveSubtitle(INSTANCE_ID, "/movie.srt") } returns ApiResult.Success(resolved)
+
+        viewModel.selectSubtitle(candidate)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(resolved, viewModel.uiState.value.selectedSubtitle)
+        assertEquals(false, viewModel.uiState.value.showSubtitleSelector)
+    }
+
+    @Test
+    fun `a subtitle resolve failure only sets subtitleError, never mediaSource or errorMessage`() = runTest {
+        coEvery { mediaRepository.resolveMedia(INSTANCE_ID, PATH) } returns ApiResult.Success(mediaSource("sign1"))
+        val viewModel = buildViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val candidate = io.openlist.client.core.model.SubtitleCandidate(
+            path = "/movie.srt",
+            name = "movie.srt",
+            language = null,
+            format = "srt",
+            source = io.openlist.client.core.model.SubtitleSourceType.AUTO_DISCOVERED,
+        )
+        coEvery { subtitleRepository.resolveSubtitle(INSTANCE_ID, "/movie.srt") } returns ApiResult.Failure(DomainError.NotFound)
+
+        viewModel.selectSubtitle(candidate)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.selectedSubtitle)
+        assertNotNull(viewModel.uiState.value.subtitleError)
+        assertNotNull(viewModel.uiState.value.mediaSource)
+        assertNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun `clearSubtitle resets selectedSubtitle to null and closes the selector`() = runTest {
+        coEvery { mediaRepository.resolveMedia(INSTANCE_ID, PATH) } returns ApiResult.Success(mediaSource("sign1"))
+        val viewModel = buildViewModel()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val resolved = io.openlist.client.core.model.SubtitleSource(path = "/movie.srt", url = "https://example.com/d/movie.srt", format = "srt")
+        coEvery { subtitleRepository.resolveSubtitle(INSTANCE_ID, "/movie.srt") } returns ApiResult.Success(resolved)
+        viewModel.selectManualSubtitle("/movie.srt")
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertNotNull(viewModel.uiState.value.selectedSubtitle)
+
+        viewModel.clearSubtitle()
+
+        assertNull(viewModel.uiState.value.selectedSubtitle)
+        assertEquals(false, viewModel.uiState.value.showSubtitleSelector)
     }
 
     private fun mediaSource(sign: String, headers: Map<String, String> = emptyMap()) = MediaSource(

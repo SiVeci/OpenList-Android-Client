@@ -4,22 +4,35 @@ package io.openlist.client.feature.preview
 
 import android.app.Activity
 import android.content.res.Configuration
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.windowInsetsPadding
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
+import io.openlist.client.core.designsystem.Spacing
 import io.openlist.client.core.model.MediaSource
+import io.openlist.client.core.model.SubtitleSource
 import kotlinx.coroutines.launch
 
 /**
@@ -27,7 +40,10 @@ import kotlinx.coroutines.launch
  * Delegates all ExoPlayer create/configure/release/error/position-sampling
  * logic to [rememberOpenListExoPlayer] (shared with [AudioPlayerSurface] per
  * S5-T3's DoD) and only adds video-specific concerns: the [PlayerView]
- * itself, and landscape immersive/fullscreen chrome (PRD §12.9 point 2).
+ * itself, landscape immersive/fullscreen chrome (PRD §12.9 point 2), and
+ * (S6-T2) a floating subtitle entry button -- [AudioPlayerSurface]
+ * deliberately has none of this (P-411 keeps subtitles/lyrics out of the
+ * audio surface).
  *
  * `PlayerView.useController` defaults to `true`, which per Media3's public
  * behavior (androidx/media/blob/release/libraries/ui/.../PlayerView.java)
@@ -48,6 +64,8 @@ internal fun MediaPlayerSurface(
     onHttpClientError: suspend () -> MediaSource?,
     onTerminalError: (PlaybackException) -> Unit,
     modifier: Modifier = Modifier,
+    subtitleSource: SubtitleSource? = null,
+    onOpenSubtitleSelector: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     val exoPlayer = rememberOpenListExoPlayer(
@@ -62,20 +80,36 @@ internal fun MediaPlayerSurface(
                 onTerminalError(error)
             }
         },
+        subtitleSource = subtitleSource,
     )
 
     ImmersiveLandscapeEffect()
 
-    AndroidView(
-        modifier = modifier.fillMaxSize(),
-        factory = { ctx ->
-            PlayerView(ctx).apply {
-                player = exoPlayer
-                useController = true
+    Box(modifier = modifier.fillMaxSize()) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { ctx ->
+                PlayerView(ctx).apply {
+                    player = exoPlayer
+                    useController = true
+                }
+            },
+            update = { view -> view.player = exoPlayer },
+        )
+
+        if (onOpenSubtitleSelector != null) {
+            FilledIconButton(
+                onClick = onOpenSubtitleSelector,
+                colors = IconButtonDefaults.filledIconButtonColors(),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(Spacing.md),
+            ) {
+                Icon(imageVector = Icons.Filled.Subtitles, contentDescription = "字幕")
             }
-        },
-        update = { view -> view.player = exoPlayer },
-    )
+        }
+    }
 }
 
 /**

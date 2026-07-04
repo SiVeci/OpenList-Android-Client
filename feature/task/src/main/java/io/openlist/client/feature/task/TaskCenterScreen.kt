@@ -62,6 +62,7 @@ import io.openlist.client.core.network.OpenListPathCodec
 fun TaskCenterScreen(
     onBack: () -> Unit,
     onOpenDirectory: (path: String) -> Unit,
+    onOpenFile: (path: String) -> Unit,
     viewModel: TaskCenterViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -132,7 +133,7 @@ fun TaskCenterScreen(
                             TaskRow(
                                 task = task,
                                 onCancel = { viewModel.openCancelConfirm(task) },
-                                onOpenDirectory = onOpenDirectory,
+                                onOpenTarget = { viewModel.openTaskTarget(task, onOpenDirectory, onOpenFile) },
                             )
                         }
                     }
@@ -187,11 +188,17 @@ fun TaskCenterScreen(
 private fun TaskRow(
     task: UnifiedTask,
     onCancel: () -> Unit,
-    onOpenDirectory: (path: String) -> Unit,
+    onOpenTarget: () -> Unit,
 ) {
     val cardStatus = task.status.toCardStatus()
     val canCancel = (task.status == UnifiedTaskStatus.RUNNING || task.status == UnifiedTaskStatus.PENDING) &&
         task.source != io.openlist.client.core.model.TaskSource.LOCAL_DOWNLOAD
+    // Unchanged condition (S6-T4 DoD: "canOpenFolder"'s own gating logic is
+    // not touched, only what a click on it does) -- still gates on
+    // SUCCESS+non-null path; the icon's name/"跳转目录" label stays even
+    // though S6-T4 may now open a file preview instead of a folder, since
+    // deciding which of the two happens is now [TaskCenterViewModel.openTaskTarget]'s
+    // job, resolved only once tapped (not known upfront without a network call).
     val canOpenFolder = task.status == UnifiedTaskStatus.SUCCESS && task.path != null
 
     TaskCard(
@@ -201,14 +208,10 @@ private fun TaskRow(
         subtitle = task.path,
         progress = task.progress?.let { it / 100f },
         errorMessage = task.errorMessage,
-        onClick = if (canOpenFolder) {
-            { onOpenDirectory(task.path!!) }
-        } else {
-            null
-        },
+        onClick = if (canOpenFolder) onOpenTarget else null,
         actions = {
             if (canOpenFolder) {
-                IconButton(onClick = { onOpenDirectory(task.path!!) }) {
+                IconButton(onClick = onOpenTarget) {
                     Icon(Icons.Filled.FolderOpen, contentDescription = "跳转目录")
                 }
             }

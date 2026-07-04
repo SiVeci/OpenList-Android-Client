@@ -25,8 +25,10 @@ import io.openlist.client.core.designsystem.components.PrimaryButton
 import io.openlist.client.core.designsystem.components.StatusBadge
 import io.openlist.client.core.designsystem.components.StatusTone
 import io.openlist.client.core.model.ExternalOpenTarget
+import io.openlist.client.core.model.FileNode
 import io.openlist.client.core.model.MediaSource
 import io.openlist.client.core.model.PreviewKind
+import io.openlist.client.core.model.SubtitleCandidate
 
 /**
  * Media player host page for the `player/{instanceId}?path={path}` route
@@ -61,6 +63,12 @@ fun MediaPlayerScreen(
         onResolveExternalOpen = { viewModel.resolveExternalOpen() },
         onDismissExternalOpenSheet = { viewModel.dismissExternalOpenSheet() },
         onExternalOpenError = { message -> viewModel.setExternalOpenError(message) },
+        onOpenSubtitleSelector = { viewModel.openSubtitleSelector() },
+        onDismissSubtitleSelector = { viewModel.dismissSubtitleSelector() },
+        onSelectSubtitleCandidate = { candidate -> viewModel.selectSubtitle(candidate) },
+        onSelectManualSubtitle = { subtitlePath -> viewModel.selectManualSubtitle(subtitlePath) },
+        onClearSubtitle = { viewModel.clearSubtitle() },
+        onLoadDirectoryEntriesForManualSubtitle = { onLoaded -> viewModel.loadDirectoryEntriesForManualSubtitle(onLoaded) },
     )
 }
 
@@ -77,6 +85,12 @@ private fun MediaPlayerScaffold(
     onResolveExternalOpen: () -> Unit,
     onDismissExternalOpenSheet: () -> Unit,
     onExternalOpenError: (String) -> Unit,
+    onOpenSubtitleSelector: () -> Unit,
+    onDismissSubtitleSelector: () -> Unit,
+    onSelectSubtitleCandidate: (SubtitleCandidate) -> Unit,
+    onSelectManualSubtitle: (String) -> Unit,
+    onClearSubtitle: () -> Unit,
+    onLoadDirectoryEntriesForManualSubtitle: (onLoaded: (List<FileNode>) -> Unit) -> Unit,
 ) {
     val mediaSource = uiState.mediaSource
     // Landscape immersive mode (handled inside MediaPlayerSurface) hides the
@@ -117,6 +131,8 @@ private fun MediaPlayerScaffold(
                 modifier = Modifier.padding(padding).fillMaxSize(),
             )
 
+            // S6-T2: subtitle entry point/track only ever passed for VIDEO --
+            // P-411 keeps AudioPlayerSurface (above) subtitle/lyrics-free.
             else -> MediaPlayerSurface(
                 mediaSource = mediaSource,
                 scopedHeaders = uiState.scopedHeaders,
@@ -125,6 +141,20 @@ private fun MediaPlayerScaffold(
                 onHttpClientError = onHttpClientError,
                 onTerminalError = { onExternalOpenError("播放失败，请重试或使用外部应用打开") },
                 modifier = Modifier.padding(padding).fillMaxSize(),
+                subtitleSource = uiState.selectedSubtitle,
+                onOpenSubtitleSelector = onOpenSubtitleSelector,
+            )
+        }
+
+        if (uiState.kind == PreviewKind.VIDEO && uiState.showSubtitleSelector) {
+            SubtitleSelector(
+                candidates = uiState.subtitleCandidates,
+                selectedSubtitlePath = uiState.selectedSubtitle?.path,
+                onSelectCandidate = onSelectSubtitleCandidate,
+                onSelectManualFile = onSelectManualSubtitle,
+                onClearSubtitle = onClearSubtitle,
+                onLoadDirectoryEntries = onLoadDirectoryEntriesForManualSubtitle,
+                onDismiss = onDismissSubtitleSelector,
             )
         }
     }
