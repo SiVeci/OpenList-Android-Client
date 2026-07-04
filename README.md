@@ -1,12 +1,12 @@
 # OpenList Android Client
 
-原生 Android 客户端，用于连接自建的 [OpenList](https://github.com/OpenListTeam/OpenList) 实例：多实例管理、登录/游客/管理员 Token 三种鉴权方式、目录浏览、文件详情、下载、文件写操作（新建/重命名/删除/移动/复制）、批量选择、上传、分享、搜索、统一任务中心、基础离线下载。
+原生 Android 客户端，用于连接自建的 [OpenList](https://github.com/OpenListTeam/OpenList) 实例：多实例管理、登录/游客/管理员 Token 三种鉴权方式、目录浏览、文件详情、下载、文件写操作（新建/重命名/删除/移动/复制）、批量选择、上传、分享、搜索、统一任务中心、基础离线下载、统一文件预览分发（图片/文本/Markdown/视频/音频 App 内预览，PDF/Office/未知格式外部打开兜底）、基础字幕支持。
 
-当前版本：**v0.3（分享 / 搜索 / 任务中心版）**。范围与后续规划见 [v0.3_PRD.md](v0.3_PRD.md)、[v0.3_EXECUTION_PLAN.md](v0.3_EXECUTION_PLAN.md)、[Full_PRD.md](Full_PRD.md)。v0.1/v0.2 范围见 [v0.1_PRD.md](v0.1_PRD.md)、[v0.2_PRD.md](v0.2_PRD.md)。
+当前版本：**v0.4（预览与播放器版）**。范围与后续规划见 [v0.4_PRD.md](v0.4_PRD.md)、[v0.4_EXECUTION_PLAN.md](v0.4_EXECUTION_PLAN.md)、[Full_PRD.md](Full_PRD.md)。v0.1/v0.2/v0.3 范围见 [v0.1_PRD.md](v0.1_PRD.md)、[v0.2_PRD.md](v0.2_PRD.md)、[v0.3_PRD.md](v0.3_PRD.md)。
 
 ## 技术栈
 
-Kotlin · Jetpack Compose (Material 3) · Hilt · Retrofit + OkHttp + kotlinx.serialization · Room · DataStore · WorkManager · Navigation Compose
+Kotlin · Jetpack Compose (Material 3) · Hilt · Retrofit + OkHttp + kotlinx.serialization · Room · DataStore · WorkManager · Navigation Compose · Coil · Media3 (ExoPlayer) · Markwon
 
 ## 工程结构
 
@@ -14,11 +14,11 @@ Kotlin · Jetpack Compose (Material 3) · Hilt · Retrofit + OkHttp + kotlinx.se
 
 ```
 core/common          ApiResult / DomainError / SafeLogger / DispatcherProvider
-core/model           领域模型（Instance / Session / FileNode / FileDetail / UploadTask / BatchOperationResult）
-core/designsystem    主题 + 交互组件（Dialog/Sheet/BatchSelectionTopBar/UploadProgressItem 等）
-core/database        Room（Instance/Session/FileCache/DownloadTask/UploadTask）+ DataStore + Migrations
+core/model           领域模型（Instance / FileNode / FileDetail / PreviewTarget / MediaSource / SubtitleCandidate 等）
+core/designsystem    主题 + 交互组件（Dialog/Sheet/BatchSelectionTopBar/ExternalOpenSheet 等）
+core/database        Room（Instance/Session/FileCache/.../PreviewCache）+ DataStore + Migrations
 core/auth            CryptoManager（Keystore AES-GCM）/ SessionManager / TokenProvider
-core/network         OpenListApi / OpenListClientFactory / 拦截器 / 路径与 URL 规范化 / 上传专用 OkHttpClient
+core/network         OpenListApi / OpenListClientFactory / 拦截器 / 路径与 URL 规范化 / 上传与预览专用 OkHttpClient
 core/domain          Repository 接口
 data/repository      Repository 实现 + UploadWorker（WorkManager CoroutineWorker）
 feature/instance     实例管理
@@ -26,18 +26,19 @@ feature/auth         登录
 feature/files        文件浏览 / 详情 / 写操作 / 批量选择 / 上传入口与进度面板 / 分享创建入口
 feature/settings     设置
 feature/upload       预留（上传 UI 内嵌在 feature/files）
-feature/share        分享列表 / 详情 / 创建 / 编辑 / 启停 / 删除
+feature/share        分享列表 / 详情 / 创建 / 编辑 / 启停 / 删除 / 分享文件预览接线
 feature/search       当前目录 / 全局搜索 + 搜索历史
 feature/task         统一任务中心（上传/下载/远程）+ 离线下载提交
+feature/preview      统一文件打开分发 / 图片/文本/Markdown 预览 / 视频音频播放器 / 字幕
 ```
 
-reserved 特性（preview/admin/webfallback）仍以 `:app` 内占位包形式保留，留待 v0.4/v0.5。
+reserved 特性（admin/webfallback）仍以 `:app` 内占位包形式保留，留待 v0.5（预览已在 v0.4 graduate 为真实模块）。
 
 ## 构建
 
 ```bash
 ./gradlew assembleDebug          # 全部模块 Debug 构建
-./gradlew testDebugUnitTest      # 本地单元测试（路径编解码 / Base URL 规范化 / 批量操作聚合）
+./gradlew testDebugUnitTest      # 本地单元测试（路径编解码 / Base URL 规范化 / 批量操作聚合 / 预览分发 / 缓存失效 / 播放重试上限 等）
 ./gradlew assembleRelease        # Release APK（见下方签名配置）
 ```
 
@@ -64,7 +65,7 @@ RELEASE_KEY_ALIAS=openlist
 RELEASE_KEY_PASSWORD=你的key密码
 ```
 
-## 快速上手（v0.3 功能范围）
+## 快速上手（v0.4 功能范围）
 
 1. 打开 App，点击「添加实例」，输入 OpenList 实例地址（`http(s)://` 开头，支持部署在子路径）。
 2. 「测试连接」确认可达（依次尝试 `/ping`、`/api/public/settings`）。
@@ -72,18 +73,21 @@ RELEASE_KEY_PASSWORD=你的key密码
 4. 登录成功后进入文件列表：目录浏览、子目录跳转、面包屑、下拉刷新；断网时展示本地缓存并提示。
 5. 已登录用户（非游客）可见写操作入口：
    - 顶部「新建目录」「上传」按钮；上传经系统文件选择器多选，后台流式上传并可在顶部「上传进度」入口查看/取消。
-   - 每行「更多」菜单：重命名、移动、复制（弹出目标目录选择器）、删除（危险操作二次确认）。
+   - 每行「更多」菜单：预览（可预览格式）、重命名、移动、复制（弹出目标目录选择器）、删除（危险操作二次确认）。
    - 长按任意行进入批量选择模式，可全选/取消全选，批量删除/移动/复制；部分失败时可点击提示上的「查看」看每一项失败原因。
-6. 点击文件进入详情页：查看基础信息、复制路径/链接、下载（走系统 `DownloadManager`，落地系统 Downloads 目录）、分享（非游客可见）。
-7. 文件菜单/详情页「分享」：路径只读 + 名称 + 密码（可空）+ 过期时间快捷项 + 启用开关，创建成功后可复制链接/密码/完整文案或调用系统分享面板。顶部「我的分享」查看/修改/启停/删除已创建的分享。
-8. 文件列表顶部「搜索」：当前目录/全局二选一，支持历史记录。
-9. 顶部「任务中心」：统一查看上传/下载/远程任务（离线下载/转存/复制/移动），可取消远程任务、完成后跳转目标目录；右上角「+」提交新的离线下载任务。
-10. 「设置」页可清理本地缓存、开关调试日志、快速进入当前实例的任务中心。
+6. 点击图片/视频/音频/文本/Markdown 文件直接进入 App 内预览/播放；点击 PDF/Office/未知格式文件进入详情页，主操作为「外部打开」（弹出外部打开/下载/网页打开三选一）。
+7. 文件详情页：可预览格式显示对应主操作（查看图片/播放视频/播放音频/查看文档），保留下载、复制路径/链接、分享入口（非游客可见）。
+8. 视频播放器：播放/暂停/进度拖动、横屏沉浸式；右上角字幕入口可选自动发现的候选字幕、从当前目录手动选择任意文件、或关闭字幕。
+9. 文件菜单/详情页「分享」：路径只读 + 名称 + 密码（可空）+ 过期时间快捷项 + 启用开关，创建成功后可复制链接/密码/完整文案或调用系统分享面板。顶部「我的分享」查看/修改/启停/删除已创建的分享；分享详情页新增「分享文件」列表，可直接预览已分享的文件。
+10. 文件列表顶部「搜索」：当前目录/全局二选一，支持历史记录，可预览的搜索结果直接进入统一预览。
+11. 顶部「任务中心」：统一查看上传/下载/远程任务（离线下载/转存/复制/移动），可取消远程任务；已完成任务点击后自动判断目标是文件还是目录，文件直接进入预览、目录跳转浏览；右上角「+」提交新的离线下载任务。
+12. 「设置」页可清理本地缓存、开关调试日志、快速进入当前实例的任务中心。
 
-v0.3 **不包含**：预览（图片/视频/文本/Markdown/PDF/Office）、管理台、App 内打开分享 URL、断点续传/分片上传。这些均已在架构层面预留，具体规划见 [v0.3_EXECUTION_PLAN.md](v0.3_EXECUTION_PLAN.md) §27，已知限制见 [KNOWN_ISSUES.md](KNOWN_ISSUES.md)。
+v0.4 **不包含**：PDF/Office 内置预览、代码高亮、歌词、图片画廊、归档文件浏览、Torrent 预览、完整分享态目录浏览、字幕在线搜索/下载、管理台、断点续传/分片上传。这些均已在架构层面预留或明确排除，具体范围见 [v0.4_PRD.md](v0.4_PRD.md) §5.3，已知限制见 [KNOWN_ISSUES.md](KNOWN_ISSUES.md)。
 
 ## 其他文档
 
 - [KNOWN_ISSUES.md](KNOWN_ISSUES.md) — 已知问题与限制
 - [RELEASE_NOTES.md](RELEASE_NOTES.md) — 版本发布说明
-- [v0.2_BACKLOG.md](v0.2_BACKLOG.md) — 下一版本待办
+- [v0.4_ACCEPTANCE_REPORT.md](v0.4_ACCEPTANCE_REPORT.md) — v0.4 验收报告
+- [v0.2_BACKLOG.md](v0.2_BACKLOG.md) — 历史版本待办

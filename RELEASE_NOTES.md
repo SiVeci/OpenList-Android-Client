@@ -1,5 +1,40 @@
 # Release Notes
 
+## v0.4.0 — 预览与播放器版
+
+范围定义见 [v0.4_PRD.md](v0.4_PRD.md)，执行过程见 [v0.4_EXECUTION_PLAN.md](v0.4_EXECUTION_PLAN.md)，Sprint 记录见 [v0.4_IMPLEMENTATION_LOG.md](v0.4_IMPLEMENTATION_LOG.md)。
+
+### 新增功能
+
+- **统一文件打开分发**：文件列表、文件详情、搜索结果、分享详情、任务中心完成项这五个入口，点击可预览文件都会经统一的 `resolvePreview` 分发（按扩展名判定 kind，再决定 App 内预览/播放、外部打开或不支持兜底），不再各自重复实现打开逻辑。
+- **图片预览**：Coil 加载，自定义 `instanceId+path+modifiedAt` 缓存 key（避免签名 URL 变化导致缓存全 miss 或跨实例串缓存），失败态可重试/下载。
+- **文本预览**：流式限长读取（默认 512KB 截断+提示，超过 20MB 直接提示"文件过大"不发起网络读取），UTF-8+BOM 自动识别，可复制全文、下载。
+- **Markdown 预览**：Markwon 原生渲染（无 WebView，不执行脚本），HTML 内容静默忽略，外链走系统浏览器，渲染异常降级为源码文本；本版本暂不支持内嵌图片渲染。
+- **PDF / Office / 未知格式外部打开兜底**：外部打开、下载、网页打开三选一，无可处理应用时安全提示不崩溃。
+- **视频播放器**：ExoPlayer 播放/暂停/进度拖动/横屏沉浸式播放；签名地址失效时自动刷新重试（上限 2 次）后仍失败给出外部打开/下载兜底。
+- **音频播放器**：同一播放内核，简洁播放/暂停/进度条布局，不做歌词。
+- **基础字幕支持**：同目录同名/前缀字幕自动发现（`srt`/`vtt`/`ass`/`ssa`）、手动从当前目录选择任意文件、可关闭字幕；字幕加载失败不阻断主视频播放。
+- **预览缓存**：文本/Markdown 内容缓存 24 小时 TTL，写操作（重命名/删除/移动/复制/上传覆盖）与删除实例均联动清理对应缓存。
+
+### 技术
+
+- **新增 `:feature:preview` 模块**：graduate 自 `:app` 内的占位包，依赖单向指向 `core:{common,model,domain,designsystem}`，不依赖任何其他 feature。
+- **Room Migration 7→8**：新增 `preview_cache` 元数据表（内容本体存 `cacheDir/preview/<instanceId>/`），迁移 SQL 手工核对；`8.json` schema 因本轮无构建环境为手工推导，需下次构建时用 KSP 实际导出重新核对（见 [KNOWN_ISSUES.md](KNOWN_ISSUES.md)）。
+- **4 个新 Repository**：`PreviewRepository`/`MediaRepository`/`SubtitleRepository`/`ExternalOpenRepository`，均遵循既有的 instance 查找/401 失效处理模式；`FileOperationRepositoryImpl`/`UploadWorker` 新增对 `PreviewRepository` 的缓存失效调用（本仓库首次出现的 Repository 间依赖，仅限缓存失效副作用场景）。
+- **新依赖**：androidx.media3（exoplayer + ui，1.4.1）、Markwon（core，4.6.2）；Coil 从 `:app` 下放到 `:feature:preview` 并正式启用；未引入任何 PDF/Office 渲染类依赖。
+- **安全**：新增 `sign` 查询参数日志脱敏（`SafeLogger`，注意单词边界避免误伤"designation"等词）；媒体播放 Header 注入按实例 host 限域（`buildScopedHttpHeaders`，当前恒不触发但机制已就位）；外部打开 URI 不含 Token，已有单测断言。
+- **`DomainError` 新增** `PreviewTooLarge`/`MediaUnsupported`/`MediaSourceExpired`/`ExternalOpenUnavailable` 四个子类。
+
+### 已知限制
+
+见 [KNOWN_ISSUES.md](KNOWN_ISSUES.md)。**本轮开发环境比以往版本更严格，禁止运行任何构建/测试命令**，因此全部验证均为静态代码审查，未做过一次编译，Media3/Markwon 等第三方库 API 用法均对照官方源码核实但未经编译或真机验证。
+
+### 下一步
+
+见 [v0.4_PRD.md](v0.4_PRD.md) 中记录的 v0.5（轻量管理台）/v1.0（原子级对齐）预留；Markdown 内嵌图片渲染、字幕在线搜索等留待后续版本评估。
+
+---
+
 ## v0.3.0 — 分享 / 搜索 / 任务中心版
 
 范围定义见 [v0.3_PRD.md](v0.3_PRD.md)，执行过程见 [v0.3_EXECUTION_PLAN.md](v0.3_EXECUTION_PLAN.md)。
