@@ -11,7 +11,7 @@ import io.openlist.client.feature.files.FileListScreen
 import io.openlist.client.feature.instance.AddInstanceScreen
 import io.openlist.client.feature.instance.InstanceListScreen
 import io.openlist.client.feature.preview.MediaPlayerPlaceholderScreen
-import io.openlist.client.feature.preview.PreviewPlaceholderScreen
+import io.openlist.client.feature.preview.PreviewScreen
 import io.openlist.client.feature.search.SearchScreen
 import io.openlist.client.feature.settings.SettingsScreen
 import io.openlist.client.feature.share.ShareDetailScreen
@@ -59,6 +59,7 @@ fun OpenListNavHost(navController: NavHostController = rememberNavController()) 
             val instanceId = backStackEntry.arguments?.getString("instanceId") ?: return@composable
             FileListScreen(
                 onOpenFileDetail = { path -> navController.navigate(Routes.fileDetail(instanceId, path)) },
+                onOpenFile = { path -> navController.navigate(Routes.preview(instanceId, path)) },
                 onBackToInstances = {
                     navController.navigate(Routes.INSTANCE_LIST) { popUpTo(0) }
                 },
@@ -67,8 +68,12 @@ fun OpenListNavHost(navController: NavHostController = rememberNavController()) 
                 onOpenTaskCenter = { navController.navigate(Routes.taskCenter(instanceId)) },
             )
         }
-        composable(Routes.FILE_DETAIL) {
-            FileDetailScreen(onBack = { navController.popBackStack() })
+        composable(Routes.FILE_DETAIL) { backStackEntry ->
+            val instanceId = backStackEntry.arguments?.getString("instanceId") ?: return@composable
+            FileDetailScreen(
+                onBack = { navController.popBackStack() },
+                onOpenFile = { path -> navController.navigate(Routes.preview(instanceId, path)) },
+            )
         }
         composable(Routes.SETTINGS) {
             SettingsScreen(
@@ -107,7 +112,12 @@ fun OpenListNavHost(navController: NavHostController = rememberNavController()) 
             val path = backStackEntry.arguments?.getString("path")
                 ?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }
                 ?: "/"
-            PreviewPlaceholderScreen(instanceId = instanceId, path = path)
+            PreviewScreen(
+                instanceId = instanceId,
+                path = path,
+                onBack = { navController.popBackStack() },
+                onOpenMediaPlayer = { mediaPath -> navController.navigate(Routes.mediaPlayer(instanceId, mediaPath)) },
+            )
         }
         composable(Routes.MEDIA_PLAYER) { backStackEntry ->
             val instanceId = backStackEntry.arguments?.getString("instanceId") ?: return@composable

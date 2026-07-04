@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.UploadFile
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BadgedBox
@@ -72,6 +73,7 @@ import io.openlist.client.core.designsystem.components.TextInputDialog
 import io.openlist.client.core.designsystem.components.UploadItemStatus
 import io.openlist.client.core.designsystem.components.UploadProgressItem
 import io.openlist.client.core.model.FileNode
+import io.openlist.client.core.model.PreviewKindResolver
 import io.openlist.client.core.model.UploadStatus
 import io.openlist.client.core.model.UploadTask
 import io.openlist.client.core.network.OpenListPathCodec
@@ -85,6 +87,7 @@ import kotlin.math.pow
 @Composable
 fun FileListScreen(
     onOpenFileDetail: (path: String) -> Unit,
+    onOpenFile: (path: String) -> Unit,
     onBackToInstances: () -> Unit,
     onOpenShareList: () -> Unit,
     onOpenSearch: (path: String) -> Unit,
@@ -215,7 +218,7 @@ fun FileListScreen(
                                 modifiedText = node.modifiedAt?.let(::formatDate),
                                 selectionMode = uiState.selectionMode,
                                 selected = node.path in uiState.selectedPaths,
-                                onClick = { viewModel.onNodeClick(node, onOpenFileDetail) },
+                                onClick = { viewModel.onNodeClick(node, onOpenFileDetail, onOpenFile) },
                                 onLongClick = if (uiState.canWrite && !uiState.selectionMode) {
                                     { viewModel.enterSelectionMode(node) }
                                 } else {
@@ -244,6 +247,7 @@ fun FileListScreen(
                 canWrite = uiState.canWrite,
                 canShare = uiState.canWrite,
                 onOpenDetail = { onOpenFileDetail(node.path) },
+                onOpenFile = { onOpenFile(node.path) },
                 onRename = { viewModel.openRenameDialog(node) },
                 onMove = { viewModel.openMovePicker(node) },
                 onCopy = { viewModel.openCopyPicker(node) },
@@ -365,12 +369,16 @@ fun FileListScreen(
 
 /** "下载" and "详情" both route to the file detail screen (v0.1's existing
  * download button lives there) rather than duplicating the download call
- * here — v0.1_EXECUTION_PLAN.md's download flow is reused as-is, not re-wired. */
+ * here — v0.1_EXECUTION_PLAN.md's download flow is reused as-is, not re-wired.
+ * "预览" (v0.4_EXECUTION_PLAN.md §11 S2-T4) only appears for kinds the v0.4
+ * preview screen actually handles in-app; PDF/OFFICE/UNKNOWN/directories
+ * keep using "详情" as their only entry point, unchanged from pre-v0.4. */
 private fun buildFileActions(
     node: FileNode,
     canWrite: Boolean,
     canShare: Boolean,
     onOpenDetail: () -> Unit,
+    onOpenFile: () -> Unit,
     onRename: () -> Unit,
     onMove: () -> Unit,
     onCopy: () -> Unit,
@@ -381,6 +389,9 @@ private fun buildFileActions(
 ): List<FileActionItem> = buildList {
     if (!node.isDir) {
         add(FileActionItem(label = "下载", icon = Icons.Outlined.Download, onClick = onOpenDetail))
+    }
+    if (!node.isDir && PreviewKindResolver.resolve(node.name) in PREVIEWABLE_KINDS) {
+        add(FileActionItem(label = "预览", icon = Icons.Filled.Visibility, onClick = onOpenFile))
     }
     add(FileActionItem(label = "详情", icon = Icons.Filled.Info, onClick = onOpenDetail))
     // Guests never see a create-share entry (v0.3_EXECUTION_PLAN.md P10).

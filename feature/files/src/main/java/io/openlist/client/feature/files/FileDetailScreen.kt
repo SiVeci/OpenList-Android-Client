@@ -37,6 +37,8 @@ import io.openlist.client.core.designsystem.components.PrimaryButton
 import io.openlist.client.core.designsystem.components.SecondaryButton
 import io.openlist.client.core.designsystem.components.StatusBadge
 import io.openlist.client.core.designsystem.components.StatusTone
+import io.openlist.client.core.model.PreviewKind
+import io.openlist.client.core.model.PreviewKindResolver
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -45,6 +47,7 @@ import java.util.Locale
 @Composable
 fun FileDetailScreen(
     onBack: () -> Unit,
+    onOpenFile: (path: String) -> Unit,
     viewModel: FileDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -111,7 +114,21 @@ fun FileDetailScreen(
                         is DownloadUiState.Failed -> ErrorBar(message = downloadState.message, onRetry = ::startDownload)
                     }
 
-                    if (!detail.isDir) {
+                    // Previewable kinds (v0.4_EXECUTION_PLAN.md §11 S2-T4) get a
+                    // primary "view/play" action; download is demoted to a
+                    // secondary action alongside copy/share for these kinds.
+                    // PDF/OFFICE/UNKNOWN/directories are unchanged from pre-v0.4:
+                    // download stays the sole primary action (S4 will give
+                    // PDF/OFFICE their own "open externally" primary action).
+                    val previewKind = if (detail.isDir) null else PreviewKindResolver.resolve(detail.name)
+                    val previewLabel = previewKind?.let { primaryPreviewLabel(it) }
+                    if (previewLabel != null) {
+                        PrimaryButton(
+                            text = previewLabel,
+                            onClick = { onOpenFile(detail.path) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    } else if (!detail.isDir) {
                         PrimaryButton(
                             text = "下载",
                             onClick = ::startDownload,
@@ -120,6 +137,13 @@ fun FileDetailScreen(
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        if (previewLabel != null) {
+                            SecondaryButton(
+                                text = "下载",
+                                onClick = ::startDownload,
+                                enabled = detail.rawUrl.isNotBlank(),
+                            )
+                        }
                         SecondaryButton(
                             text = "复制路径",
                             onClick = { clipboardManager.setText(AnnotatedString(detail.path)) },
@@ -149,6 +173,16 @@ fun FileDetailScreen(
             onDismiss = { viewModel.dismissShareCreate() },
         )
     }
+}
+
+/** Primary-button label for kinds the v0.4 preview screen opens in-app; null
+ * for PDF/OFFICE/UNKNOWN, which keep "下载" as their only primary action. */
+private fun primaryPreviewLabel(kind: PreviewKind): String? = when (kind) {
+    PreviewKind.IMAGE -> "查看图片"
+    PreviewKind.VIDEO -> "播放视频"
+    PreviewKind.AUDIO -> "播放音频"
+    PreviewKind.TEXT, PreviewKind.MARKDOWN -> "查看文档"
+    PreviewKind.PDF, PreviewKind.OFFICE, PreviewKind.UNKNOWN -> null
 }
 
 @Composable
