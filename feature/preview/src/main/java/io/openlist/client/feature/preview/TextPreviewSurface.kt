@@ -2,6 +2,7 @@ package io.openlist.client.feature.preview
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -13,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -32,10 +34,16 @@ import io.openlist.client.core.model.TextPreviewContent
  * around Compose UI 1.7/1.8) since this project's compose-bom (2024.12.01)
  * predates that API settling, and this call is a simple synchronous
  * "copy all text" button, not a multi-format clipboard write.
+ *
+ * [onDownload] (v0.4_EXECUTION_PLAN.md §11 S4-T3, PRD §12.7 point 3) sits
+ * next to "复制全部文本" — this was missed in S3 and is added here so a
+ * truncated or otherwise-incomplete text preview always has a way to fetch
+ * the full file.
  */
 @Composable
 fun TextPreviewSurface(
     content: TextPreviewContent,
+    onDownload: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val clipboardManager = LocalClipboardManager.current
@@ -55,11 +63,16 @@ fun TextPreviewSurface(
                 modifier = Modifier.fillMaxWidth().padding(Spacing.md),
             )
         }
-        TextButton(
-            onClick = { clipboardManager.setText(AnnotatedString(content.text)) },
+        Row(
             modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("复制全部文本")
+            TextButton(onClick = { clipboardManager.setText(AnnotatedString(content.text)) }) {
+                Text("复制全部文本")
+            }
+            TextButton(onClick = onDownload) {
+                Text("下载")
+            }
         }
     }
 }

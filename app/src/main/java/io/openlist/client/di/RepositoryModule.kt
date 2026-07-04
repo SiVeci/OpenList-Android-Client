@@ -20,6 +20,7 @@ import io.openlist.client.core.domain.TaskAggregationRepository
 import io.openlist.client.core.domain.TaskRepository
 import io.openlist.client.core.domain.TransferRepository
 import io.openlist.client.core.domain.UploadRepository
+import io.openlist.client.data.repository.AndroidMimeTypeResolver
 import io.openlist.client.data.repository.AuthRepositoryImpl
 import io.openlist.client.data.repository.DirectoryPickerRepositoryImpl
 import io.openlist.client.data.repository.ExternalOpenRepositoryImpl
@@ -27,6 +28,7 @@ import io.openlist.client.data.repository.FileOperationRepositoryImpl
 import io.openlist.client.data.repository.FilesRepositoryImpl
 import io.openlist.client.data.repository.InstanceRepositoryImpl
 import io.openlist.client.data.repository.MediaRepositoryImpl
+import io.openlist.client.data.repository.MimeTypeResolver
 import io.openlist.client.data.repository.OfflineDownloadRepositoryImpl
 import io.openlist.client.data.repository.PreviewRepositoryImpl
 import io.openlist.client.data.repository.SearchRepositoryImpl
@@ -104,4 +106,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindExternalOpenRepository(impl: ExternalOpenRepositoryImpl): ExternalOpenRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindMimeTypeResolver(impl: AndroidMimeTypeResolver): MimeTypeResolver
 }

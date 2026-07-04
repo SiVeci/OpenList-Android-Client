@@ -117,9 +117,11 @@ fun FileDetailScreen(
                     // Previewable kinds (v0.4_EXECUTION_PLAN.md §11 S2-T4) get a
                     // primary "view/play" action; download is demoted to a
                     // secondary action alongside copy/share for these kinds.
-                    // PDF/OFFICE/UNKNOWN/directories are unchanged from pre-v0.4:
-                    // download stays the sole primary action (S4 will give
-                    // PDF/OFFICE their own "open externally" primary action).
+                    // PDF/OFFICE/UNKNOWN (S4-T3) now route through the same
+                    // primary action -> onOpenFile -> PreviewScreen path, which
+                    // resolves them to EXTERNAL_APP/UNSUPPORTED and shows the
+                    // "外部打开" fallback there. Directories are the only kind
+                    // still excluded (previewKind stays null for them).
                     val previewKind = if (detail.isDir) null else PreviewKindResolver.resolve(detail.name)
                     val previewLabel = previewKind?.let { primaryPreviewLabel(it) }
                     if (previewLabel != null) {
@@ -175,14 +177,20 @@ fun FileDetailScreen(
     }
 }
 
-/** Primary-button label for kinds the v0.4 preview screen opens in-app; null
- * for PDF/OFFICE/UNKNOWN, which keep "下载" as their only primary action. */
+/** Primary-button label for kinds the v0.4 preview screen opens in-app.
+ * PDF/OFFICE/UNKNOWN (v0.4_EXECUTION_PLAN.md §11 S4-T3, P-404) now also
+ * return a label instead of null: PreviewScreen's EXTERNAL_APP/UNSUPPORTED
+ * branches (resolved for these three kinds by
+ * PreviewRepositoryImpl.openModeAndFallbacksFor) give them a real "外部打开"
+ * fallback UI, so routing there via the same `onOpenFile` callback as every
+ * other kind is correct — no separate onOpenFile-bypassing Intent logic
+ * belongs in this screen. */
 private fun primaryPreviewLabel(kind: PreviewKind): String? = when (kind) {
     PreviewKind.IMAGE -> "查看图片"
     PreviewKind.VIDEO -> "播放视频"
     PreviewKind.AUDIO -> "播放音频"
     PreviewKind.TEXT, PreviewKind.MARKDOWN -> "查看文档"
-    PreviewKind.PDF, PreviewKind.OFFICE, PreviewKind.UNKNOWN -> null
+    PreviewKind.PDF, PreviewKind.OFFICE, PreviewKind.UNKNOWN -> "外部打开"
 }
 
 @Composable

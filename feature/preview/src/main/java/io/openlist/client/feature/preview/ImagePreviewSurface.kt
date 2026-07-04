@@ -34,16 +34,16 @@ fun buildPreviewCacheKey(instanceId: String, path: String, modifiedAt: Long?): S
 /**
  * Real in-app image preview (v0.4_EXECUTION_PLAN.md §11 S2-T3). Renders via
  * Coil's AsyncImage, scaled to fit the available space. On load failure, the
- * image is replaced by an [ErrorBar] plus a download affordance — this Sprint
- * only wires that button to a disabled/"not yet available" state since
- * TransferRepository call sites are out of scope here (S4's ExternalOpenSheet
- * is where a real "open externally" action belongs).
+ * image is replaced by an [ErrorBar] plus a real download affordance (S4-T3
+ * — [onDownload] delegates to [PreviewViewModel.download], the same
+ * getFile-then-enqueueDownload flow `:feature:files` uses).
  */
 @Composable
 fun ImagePreviewSurface(
     source: PreviewSource.RemoteUrl,
     contentDescription: String,
     cacheKey: String,
+    onDownload: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var loadFailed by remember(cacheKey) { mutableStateOf(false) }
@@ -53,9 +53,8 @@ fun ImagePreviewSurface(
         Column(modifier = modifier.fillMaxSize()) {
             ErrorBar(message = "图片加载失败")
             SecondaryButton(
-                text = "下载（暂未接入）",
-                onClick = {},
-                enabled = false,
+                text = "下载",
+                onClick = onDownload,
             )
         }
         return
