@@ -2,14 +2,13 @@
 
 | Version | PRD | Execution Plan | Implementation | Acceptance | Status |
 |---|---|---|---|---|---|
-| v0.1 | Done | Done | Done | Done | Completed |
-| v0.2 | Done | Done | Done | Done | Completed |
-| v0.3 | Done | Done | Pending/Done | Pending/Done | Update before next version |
+| v0.1 | Done | Done | Done | [Partially Accepted](v0.1_ACCEPTANCE_REPORT.md) | Completed |
+| v0.2 | Done | Done | Done | [Partially Accepted](v0.2_ACCEPTANCE_REPORT.md) | Completed |
+| v0.3 | Done | Done | Done | [Done](v0.3_ACCEPTANCE_REPORT.md) | Completed |
 | v0.4 | Pending | Pending | Pending | Pending | Not Started |
 
 Current latest completed version:
-- v0.2
+- v0.3
 
 Current active version:
-- v0.3, if not yet implemented
-- v0.4, after v0.3 acceptance
+- v0.4, not yet started

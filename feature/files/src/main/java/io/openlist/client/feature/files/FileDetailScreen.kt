@@ -129,10 +129,25 @@ fun FileDetailScreen(
                             onClick = { clipboardManager.setText(AnnotatedString(detail.rawUrl)) },
                             enabled = detail.rawUrl.isNotBlank(),
                         )
+                        if (uiState.canShare) {
+                            SecondaryButton(text = "分享", onClick = { viewModel.openShareCreate() })
+                        }
                     }
                 }
             }
         }
+    }
+
+    uiState.shareCreate?.let { shareCreate ->
+        ShareCreateSheet(
+            state = shareCreate,
+            onNameChange = viewModel::updateShareCreateName,
+            onPasswordChange = viewModel::updateShareCreatePassword,
+            onExpiryOptionChange = viewModel::updateShareCreateExpiryOption,
+            onEnabledChange = viewModel::updateShareCreateEnabled,
+            onSubmit = { viewModel.submitShareCreate() },
+            onDismiss = { viewModel.dismissShareCreate() },
+        )
     }
 }
 

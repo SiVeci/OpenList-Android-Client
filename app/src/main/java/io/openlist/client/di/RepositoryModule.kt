@@ -9,6 +9,11 @@ import io.openlist.client.core.domain.DirectoryPickerRepository
 import io.openlist.client.core.domain.FileOperationRepository
 import io.openlist.client.core.domain.FilesRepository
 import io.openlist.client.core.domain.InstanceRepository
+import io.openlist.client.core.domain.OfflineDownloadRepository
+import io.openlist.client.core.domain.SearchRepository
+import io.openlist.client.core.domain.ShareRepository
+import io.openlist.client.core.domain.TaskAggregationRepository
+import io.openlist.client.core.domain.TaskRepository
 import io.openlist.client.core.domain.TransferRepository
 import io.openlist.client.core.domain.UploadRepository
 import io.openlist.client.data.repository.AuthRepositoryImpl
@@ -16,6 +21,11 @@ import io.openlist.client.data.repository.DirectoryPickerRepositoryImpl
 import io.openlist.client.data.repository.FileOperationRepositoryImpl
 import io.openlist.client.data.repository.FilesRepositoryImpl
 import io.openlist.client.data.repository.InstanceRepositoryImpl
+import io.openlist.client.data.repository.OfflineDownloadRepositoryImpl
+import io.openlist.client.data.repository.SearchRepositoryImpl
+import io.openlist.client.data.repository.ShareRepositoryImpl
+import io.openlist.client.data.repository.TaskAggregationRepositoryImpl
+import io.openlist.client.data.repository.TaskRepositoryImpl
 import io.openlist.client.data.repository.TransferRepositoryImpl
 import io.openlist.client.data.repository.UploadRepositoryImpl
 import javax.inject.Singleton
@@ -50,4 +60,24 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindUploadRepository(impl: UploadRepositoryImpl): UploadRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindShareRepository(impl: ShareRepositoryImpl): ShareRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSearchRepository(impl: SearchRepositoryImpl): SearchRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindTaskRepository(impl: TaskRepositoryImpl): TaskRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindOfflineDownloadRepository(impl: OfflineDownloadRepositoryImpl): OfflineDownloadRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindTaskAggregationRepository(impl: TaskAggregationRepositoryImpl): TaskAggregationRepository
 }

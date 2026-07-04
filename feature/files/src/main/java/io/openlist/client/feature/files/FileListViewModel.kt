@@ -9,6 +9,7 @@ import io.openlist.client.core.common.ApiResult
 import io.openlist.client.core.common.toUserMessage
 import io.openlist.client.core.designsystem.components.DirectoryPickerContent
 import io.openlist.client.core.designsystem.components.DirectoryPickerEntry
+import io.openlist.client.core.designsystem.components.ExpiryOption
 import io.openlist.client.core.designsystem.components.buildOperationResultMessage
 import io.openlist.client.core.domain.AuthRepository
 import io.openlist.client.core.domain.DirectoryPickerRepository
@@ -16,6 +17,7 @@ import io.openlist.client.core.domain.FileListResult
 import io.openlist.client.core.domain.FileOperationRepository
 import io.openlist.client.core.domain.FilesRepository
 import io.openlist.client.core.domain.InstanceRepository
+import io.openlist.client.core.domain.ShareRepository
 import io.openlist.client.core.domain.UploadRepository
 import io.openlist.client.core.model.BatchOperationFailure
 import io.openlist.client.core.model.FileNode
@@ -88,6 +90,7 @@ data class FileListUiState(
     val selectedPaths: Set<String> = emptySet(),
     val uploadTasks: List<UploadTask> = emptyList(),
     val showUploadPanel: Boolean = false,
+    val shareCreate: ShareCreateState? = null,
 ) {
     val allSelected: Boolean get() = nodes.isNotEmpty() && selectedPaths.size == nodes.size
     val hasActiveUploads: Boolean get() = uploadTasks.any { it.status == UploadStatus.PENDING || it.status == UploadStatus.RUNNING }
@@ -102,6 +105,7 @@ class FileListViewModel @Inject constructor(
     private val fileOperationRepository: FileOperationRepository,
     private val directoryPickerRepository: DirectoryPickerRepository,
     private val uploadRepository: UploadRepository,
+    private val shareRepository: ShareRepository,
 ) : ViewModel() {
 
     private val instanceId: String = checkNotNull(savedStateHandle["instanceId"])
@@ -513,5 +517,36 @@ class FileListViewModel @Inject constructor(
                 previousById[task.id]?.status != UploadStatus.SUCCESS
         }
         if (justSucceededHere) refresh()
+    }
+
+    // --- Share creation (v0.3_EXECUTION_PLAN.md §14) -------------------------
+
+    fun openShareCreate(node: FileNode) {
+        _uiState.update { it.copy(actionSheetTarget = null, shareCreate = ShareCreateState(targetPath = node.path)) }
+    }
+
+    fun dismissShareCreate() {
+        _uiState.update { it.copy(shareCreate = null) }
+    }
+
+    fun updateShareCreateName(value: String) = updateShareCreate { it.copy(name = value) }
+    fun updateShareCreatePassword(value: String) = updateShareCreate { it.copy(password = value) }
+    fun updateShareCreateExpiryOption(option: ExpiryOption) = updateShareCreate { it.copy(expiryOption = option) }
+    fun updateShareCreateCustomExpiry(millis: Long) = updateShareCreate { it.copy(customExpiryMillis = millis) }
+    fun updateShareCreateEnabled(enabled: Boolean) = updateShareCreate { it.copy(enabled = enabled) }
+
+    private fun updateShareCreate(transform: (ShareCreateState) -> ShareCreateState) {
+        _uiState.update { st -> st.shareCreate?.let { st.copy(shareCreate = transform(it)) } ?: st }
+    }
+
+    fun submitShareCreate() {
+        val state = _uiState.value.shareCreate ?: return
+        viewModelScope.launch {
+            updateShareCreate { it.copy(submitting = true, errorMessage = null) }
+            when (val result = submitShareCreate(shareRepository, instanceRepository, instanceId, state)) {
+                is ApiResult.Success -> _uiState.update { it.copy(shareCreate = result.data) }
+                is ApiResult.Failure -> updateShareCreate { it.copy(submitting = false, errorMessage = result.error.toUserMessage()) }
+            }
+        }
     }
 }

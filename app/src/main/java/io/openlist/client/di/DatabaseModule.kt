@@ -9,11 +9,15 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.openlist.client.core.database.MIGRATION_4_5
 import io.openlist.client.core.database.MIGRATION_5_6
+import io.openlist.client.core.database.MIGRATION_6_7
 import io.openlist.client.core.database.OpenListDatabase
 import io.openlist.client.core.database.dao.DownloadTaskDao
 import io.openlist.client.core.database.dao.FileCacheDao
 import io.openlist.client.core.database.dao.InstanceDao
+import io.openlist.client.core.database.dao.RemoteTaskDao
+import io.openlist.client.core.database.dao.SearchHistoryDao
 import io.openlist.client.core.database.dao.SessionDao
+import io.openlist.client.core.database.dao.ShareDao
 import io.openlist.client.core.database.dao.UploadTaskDao
 import javax.inject.Singleton
 
@@ -30,7 +34,7 @@ object DatabaseModule {
         Room.databaseBuilder(context, OpenListDatabase::class.java, "openlist.db")
             // v0.1.0 has shipped with real user data, so schema bumps from here on
             // require hand-written Migrations instead of a destructive fallback.
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
             .build()
 
     @Provides
@@ -47,4 +51,13 @@ object DatabaseModule {
 
     @Provides
     fun provideUploadTaskDao(database: OpenListDatabase): UploadTaskDao = database.uploadTaskDao()
+
+    @Provides
+    fun provideShareDao(database: OpenListDatabase): ShareDao = database.shareDao()
+
+    @Provides
+    fun provideSearchHistoryDao(database: OpenListDatabase): SearchHistoryDao = database.searchHistoryDao()
+
+    @Provides
+    fun provideRemoteTaskDao(database: OpenListDatabase): RemoteTaskDao = database.remoteTaskDao()
 }

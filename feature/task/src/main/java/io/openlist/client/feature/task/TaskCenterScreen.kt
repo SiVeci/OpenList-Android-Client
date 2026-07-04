@@ -1,0 +1,240 @@
+package io.openlist.client.feature.task
+
+import android.app.DownloadManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import androidx.core.content.ContextCompat
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DriveFileMove
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.FileCopy
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Task
+import androidx.compose.material.icons.filled.UploadFile
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import io.openlist.client.core.designsystem.Spacing
+import io.openlist.client.core.designsystem.components.AppTopBar
+import io.openlist.client.core.designsystem.components.ConfirmDialog
+import io.openlist.client.core.designsystem.components.DirectoryPickerSheet
+import io.openlist.client.core.designsystem.components.EmptyState
+import io.openlist.client.core.designsystem.components.ErrorBar
+import io.openlist.client.core.designsystem.components.OfflineDownloadSheet
+import io.openlist.client.core.designsystem.components.TaskCard
+import io.openlist.client.core.designsystem.components.TaskCardStatus
+import io.openlist.client.core.designsystem.components.TaskTabRow
+import io.openlist.client.core.model.TaskType
+import io.openlist.client.core.model.UnifiedTask
+import io.openlist.client.core.model.UnifiedTaskStatus
+import io.openlist.client.core.network.OpenListPathCodec
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TaskCenterScreen(
+    onBack: () -> Unit,
+    onOpenDirectory: (path: String) -> Unit,
+    viewModel: TaskCenterViewModel = hiltViewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+
+    // P9's other half: refreshes local download status the moment
+    // DownloadManager finishes one, on top of the 4s remote poll — registered
+    // only while this screen is on screen, unregistered on leaving it.
+    DisposableEffect(Unit) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context, intent: Intent) {
+                viewModel.refresh()
+            }
+        }
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        onDispose { context.unregisterReceiver(receiver) }
+    }
+
+    LaunchedEffect(uiState.snackbarMessage) {
+        val message = uiState.snackbarMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        viewModel.dismissSnackbar()
+    }
+
+    Scaffold(
+        topBar = {
+            Column {
+                AppTopBar(title = "任务中心", onBack = onBack)
+                TaskTabRow(
+                    tabs = listOf("全部", "上传", "下载", "远程"),
+                    selectedIndex = TaskTab.entries.indexOf(uiState.selectedTab),
+                    onTabSelected = { index -> viewModel.selectTab(TaskTab.entries[index]) },
+                )
+            }
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = { viewModel.openOfflineDownloadSheet() }) {
+                Icon(Icons.Filled.Add, contentDescription = "新增离线下载")
+            }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+    ) { padding ->
+        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+            uiState.remoteErrorMessage?.let { message ->
+                ErrorBar(message = message, onRetry = { viewModel.refresh() }, modifier = Modifier.fillMaxWidth())
+            }
+            PullToRefreshBox(
+                isRefreshing = uiState.isRefreshing,
+                onRefresh = { viewModel.refresh() },
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                val tasks = uiState.filteredTasks
+                if (tasks.isEmpty()) {
+                    EmptyState(title = "暂无任务", modifier = Modifier.fillMaxSize())
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(Spacing.md),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    ) {
+                        items(tasks, key = { it.id }) { task ->
+                            TaskRow(
+                                task = task,
+                                onCancel = { viewModel.openCancelConfirm(task) },
+                                onOpenDirectory = onOpenDirectory,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    uiState.cancelConfirmTarget?.let { task ->
+        ConfirmDialog(
+            title = "取消任务",
+            message = "确定取消「${task.title}」吗？",
+            onConfirm = { viewModel.confirmCancel() },
+            onDismiss = { viewModel.dismissCancelConfirm() },
+            confirmText = "取消任务",
+            danger = true,
+            loading = uiState.cancelling,
+        )
+    }
+
+    uiState.offlineDownload?.let { offlineState ->
+        OfflineDownloadSheet(
+            url = offlineState.url,
+            onUrlChange = viewModel::updateOfflineDownloadUrl,
+            targetDirText = offlineState.targetDir,
+            onPickDirectory = { viewModel.openDirectoryPicker() },
+            tools = offlineState.tools,
+            selectedTool = offlineState.selectedTool,
+            onToolSelected = viewModel::updateOfflineDownloadTool,
+            onDismiss = { viewModel.dismissOfflineDownloadSheet() },
+            onSubmit = { viewModel.submitOfflineDownload() },
+            submitting = offlineState.submitting,
+            errorMessage = offlineState.errorMessage,
+        )
+
+        offlineState.pickerPath?.let { pickerPath ->
+            DirectoryPickerSheet(
+                title = "选择保存目录",
+                breadcrumbSegments = listOf("根目录") + OpenListPathCodec.segments(pickerPath),
+                content = offlineState.pickerContent,
+                onSegmentClick = { index -> viewModel.directoryPickerNavigateToSegment(index) },
+                onEnterDirectory = { entry -> viewModel.directoryPickerEnter(entry) },
+                onSelectCurrent = { viewModel.confirmDirectoryPicker() },
+                onRefresh = { viewModel.directoryPickerRefresh() },
+                onDismiss = { viewModel.dismissDirectoryPicker() },
+            )
+        }
+    }
+}
+
+@Composable
+private fun TaskRow(
+    task: UnifiedTask,
+    onCancel: () -> Unit,
+    onOpenDirectory: (path: String) -> Unit,
+) {
+    val cardStatus = task.status.toCardStatus()
+    val canCancel = (task.status == UnifiedTaskStatus.RUNNING || task.status == UnifiedTaskStatus.PENDING) &&
+        task.source != io.openlist.client.core.model.TaskSource.LOCAL_DOWNLOAD
+    val canOpenFolder = task.status == UnifiedTaskStatus.SUCCESS && task.path != null
+
+    TaskCard(
+        icon = task.type.toIcon(),
+        title = task.title,
+        status = cardStatus,
+        subtitle = task.path,
+        progress = task.progress?.let { it / 100f },
+        errorMessage = task.errorMessage,
+        onClick = if (canOpenFolder) {
+            { onOpenDirectory(task.path!!) }
+        } else {
+            null
+        },
+        actions = {
+            if (canOpenFolder) {
+                IconButton(onClick = { onOpenDirectory(task.path!!) }) {
+                    Icon(Icons.Filled.FolderOpen, contentDescription = "跳转目录")
+                }
+            }
+            if (canCancel) {
+                IconButton(onClick = onCancel) {
+                    Icon(Icons.Filled.Close, contentDescription = "取消")
+                }
+            }
+        },
+    )
+}
+
+private fun UnifiedTaskStatus.toCardStatus(): TaskCardStatus = when (this) {
+    UnifiedTaskStatus.PENDING -> TaskCardStatus.PENDING
+    UnifiedTaskStatus.RUNNING -> TaskCardStatus.RUNNING
+    UnifiedTaskStatus.SUCCESS -> TaskCardStatus.SUCCESS
+    UnifiedTaskStatus.FAILED -> TaskCardStatus.FAILED
+    UnifiedTaskStatus.CANCELLED -> TaskCardStatus.CANCELLED
+    UnifiedTaskStatus.UNKNOWN -> TaskCardStatus.UNKNOWN
+}
+
+private fun TaskType.toIcon(): ImageVector = when (this) {
+    TaskType.UPLOAD -> Icons.Filled.UploadFile
+    TaskType.DOWNLOAD -> Icons.Filled.Download
+    TaskType.OFFLINE_DOWNLOAD -> Icons.Filled.CloudDownload
+    TaskType.COPY -> Icons.Filled.FileCopy
+    TaskType.MOVE -> Icons.AutoMirrored.Filled.DriveFileMove
+    TaskType.INDEX, TaskType.EXTRACT, TaskType.UNKNOWN -> Icons.Filled.Task
+}

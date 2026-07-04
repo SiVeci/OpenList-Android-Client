@@ -32,7 +32,7 @@ android {
         applicationId = "io.openlist.client"
         minSdk = 29
         targetSdk = 35
-        versionCode = 2
+        versionCode = 3
         versionName = libs.versions.appVersionName.get()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -100,6 +100,9 @@ dependencies {
     implementation(project(":feature:files"))
     implementation(project(":feature:settings"))
     implementation(project(":feature:upload"))
+    implementation(project(":feature:share"))
+    implementation(project(":feature:search"))
+    implementation(project(":feature:task"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DriveFileMove
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CreateNewFolder
@@ -23,6 +24,8 @@ import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.FileCopy
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material3.AlertDialog
@@ -63,6 +66,8 @@ import io.openlist.client.core.designsystem.components.FileActionItem
 import io.openlist.client.core.designsystem.components.FileActionSheet
 import io.openlist.client.core.designsystem.components.ListRowItem
 import io.openlist.client.core.designsystem.components.LoadingState
+import io.openlist.client.core.designsystem.components.ShareFormSheet
+import io.openlist.client.core.designsystem.components.ShareLinkActions
 import io.openlist.client.core.designsystem.components.TextInputDialog
 import io.openlist.client.core.designsystem.components.UploadItemStatus
 import io.openlist.client.core.designsystem.components.UploadProgressItem
@@ -81,6 +86,9 @@ import kotlin.math.pow
 fun FileListScreen(
     onOpenFileDetail: (path: String) -> Unit,
     onBackToInstances: () -> Unit,
+    onOpenShareList: () -> Unit,
+    onOpenSearch: (path: String) -> Unit,
+    onOpenTaskCenter: () -> Unit,
     viewModel: FileListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -125,6 +133,23 @@ fun FileListScreen(
                         title = uiState.instanceName,
                         onBack = onBackToInstances,
                         actions = {
+                            IconButton(onClick = { onOpenSearch(uiState.currentPath) }) {
+                                Icon(Icons.Filled.Search, contentDescription = "搜索")
+                            }
+                            if (uiState.canWrite) {
+                                IconButton(onClick = onOpenShareList) {
+                                    Icon(Icons.Filled.Share, contentDescription = "我的分享")
+                                }
+                            }
+                            IconButton(onClick = onOpenTaskCenter) {
+                                if (uiState.hasActiveUploads) {
+                                    BadgedBox(badge = { Badge() }) {
+                                        Icon(Icons.Filled.Checklist, contentDescription = "任务中心")
+                                    }
+                                } else {
+                                    Icon(Icons.Filled.Checklist, contentDescription = "任务中心")
+                                }
+                            }
                             if (uiState.uploadTasks.isNotEmpty()) {
                                 IconButton(onClick = { viewModel.openUploadPanel() }) {
                                     if (uiState.hasActiveUploads) {
@@ -217,6 +242,7 @@ fun FileListScreen(
             actions = buildFileActions(
                 node = node,
                 canWrite = uiState.canWrite,
+                canShare = uiState.canWrite,
                 onOpenDetail = { onOpenFileDetail(node.path) },
                 onRename = { viewModel.openRenameDialog(node) },
                 onMove = { viewModel.openMovePicker(node) },
@@ -224,8 +250,21 @@ fun FileListScreen(
                 onDelete = { viewModel.openDeleteConfirm(node) },
                 onCopyPath = { clipboardManager.setText(AnnotatedString(node.path)) },
                 onCopyName = { clipboardManager.setText(AnnotatedString(node.name)) },
+                onShare = { viewModel.openShareCreate(node) },
             ),
             onDismiss = { viewModel.dismissActionSheet() },
+        )
+    }
+
+    uiState.shareCreate?.let { shareCreate ->
+        ShareCreateSheet(
+            state = shareCreate,
+            onNameChange = viewModel::updateShareCreateName,
+            onPasswordChange = viewModel::updateShareCreatePassword,
+            onExpiryOptionChange = viewModel::updateShareCreateExpiryOption,
+            onEnabledChange = viewModel::updateShareCreateEnabled,
+            onSubmit = { viewModel.submitShareCreate() },
+            onDismiss = { viewModel.dismissShareCreate() },
         )
     }
 
@@ -330,6 +369,7 @@ fun FileListScreen(
 private fun buildFileActions(
     node: FileNode,
     canWrite: Boolean,
+    canShare: Boolean,
     onOpenDetail: () -> Unit,
     onRename: () -> Unit,
     onMove: () -> Unit,
@@ -337,11 +377,16 @@ private fun buildFileActions(
     onDelete: () -> Unit,
     onCopyPath: () -> Unit,
     onCopyName: () -> Unit,
+    onShare: () -> Unit,
 ): List<FileActionItem> = buildList {
     if (!node.isDir) {
         add(FileActionItem(label = "下载", icon = Icons.Outlined.Download, onClick = onOpenDetail))
     }
     add(FileActionItem(label = "详情", icon = Icons.Filled.Info, onClick = onOpenDetail))
+    // Guests never see a create-share entry (v0.3_EXECUTION_PLAN.md P10).
+    if (canShare) {
+        add(FileActionItem(label = "分享", icon = Icons.Filled.Share, onClick = onShare))
+    }
     if (canWrite) {
         add(FileActionItem(label = "重命名", icon = Icons.Filled.DriveFileRenameOutline, onClick = onRename))
         add(FileActionItem(label = "移动", icon = Icons.AutoMirrored.Filled.DriveFileMove, onClick = onMove))

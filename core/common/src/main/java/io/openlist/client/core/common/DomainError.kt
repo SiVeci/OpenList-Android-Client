@@ -12,6 +12,10 @@ sealed class DomainError {
     data object InvalidInstance : DomainError()
     data object CertificateError : DomainError()
     data object PathEncodeError : DomainError()
+    /** The instance has no search index built/enabled (v0.3_EXECUTION_PLAN.md §19, V-04). */
+    data object SearchNotAvailable : DomainError()
+    /** A share id no longer resolves (deleted, or never existed). */
+    data object ShareNotFound : DomainError()
     data class OpenListError(val code: Int?, val message: String) : DomainError()
     data class Unknown(val throwable: Throwable?) : DomainError()
 }
@@ -29,6 +33,8 @@ fun DomainError.toUserMessage(): String = when (this) {
     DomainError.InvalidInstance -> "实例地址无效，请检查后重试"
     DomainError.CertificateError -> "证书不可信，请检查实例地址"
     DomainError.PathEncodeError -> "路径解析失败"
+    DomainError.SearchNotAvailable -> "该实例未启用搜索索引"
+    DomainError.ShareNotFound -> "分享不存在或已被删除"
     is DomainError.OpenListError -> message.ifBlank { "请求失败${code?.let { " ($it)" } ?: ""}" }
     is DomainError.Unknown -> "出现未知错误，请重试"
 }

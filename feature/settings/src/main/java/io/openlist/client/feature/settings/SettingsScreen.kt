@@ -33,10 +33,12 @@ import io.openlist.client.core.designsystem.components.AppTopBar
 fun SettingsScreen(
     onBack: () -> Unit,
     onOpenInstances: () -> Unit,
+    onOpenTaskCenter: (instanceId: String) -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val loggingEnabled by viewModel.loggingEnabled.collectAsState()
     val cacheCleared by viewModel.cacheCleared.collectAsState()
+    val currentInstanceId by viewModel.currentInstanceId.collectAsState()
     var showClearCacheConfirm by remember { mutableStateOf(false) }
     var showLicenses by remember { mutableStateOf(false) }
     var showClearedNotice by remember { mutableStateOf(false) }
@@ -54,6 +56,10 @@ fun SettingsScreen(
         Column(modifier = Modifier.padding(padding).fillMaxWidth()) {
             SettingsRow(title = "实例管理", subtitle = "添加、切换、删除实例", onClick = onOpenInstances)
             HorizontalDivider()
+            currentInstanceId?.let { instanceId ->
+                SettingsRow(title = "任务中心", subtitle = "当前实例的上传、下载、远程任务", onClick = { onOpenTaskCenter(instanceId) })
+                HorizontalDivider()
+            }
             SettingsRow(title = "清理缓存", subtitle = "清除所有实例的本地目录缓存", onClick = { showClearCacheConfirm = true })
             HorizontalDivider()
             SettingsSwitchRow(

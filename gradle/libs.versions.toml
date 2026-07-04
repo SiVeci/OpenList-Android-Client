@@ -1,5 +1,5 @@
 [versions]
-appVersionName = "0.2.0"
+appVersionName = "0.3.0"
 agp = "8.13.2"
 kotlin = "2.0.21"
 ksp = "2.0.21-1.0.28"

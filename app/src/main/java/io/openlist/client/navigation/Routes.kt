@@ -14,10 +14,18 @@ object Routes {
     const val FILE_LIST = "files/{instanceId}?path={path}"
     const val FILE_DETAIL = "file_detail/{instanceId}?path={path}"
     const val SETTINGS = "settings"
+    const val SHARE_LIST = "share_list/{instanceId}"
+    const val SHARE_DETAIL = "share_detail/{instanceId}/{shareId}"
+    const val SEARCH = "search/{instanceId}?path={path}"
+    const val TASK_CENTER = "task_center/{instanceId}"
 
     fun login(instanceId: String) = "login/$instanceId"
     fun fileList(instanceId: String, path: String = "/") = "files/$instanceId?path=${encodePathArg(path)}"
     fun fileDetail(instanceId: String, path: String) = "file_detail/$instanceId?path=${encodePathArg(path)}"
+    fun shareList(instanceId: String) = "share_list/$instanceId"
+    fun shareDetail(instanceId: String, shareId: String) = "share_detail/$instanceId/$shareId"
+    fun search(instanceId: String, path: String = "/") = "search/$instanceId?path=${encodePathArg(path)}"
+    fun taskCenter(instanceId: String) = "task_center/$instanceId"
 
     private fun encodePathArg(path: String) =
         java.net.URLEncoder.encode(path, "UTF-8")

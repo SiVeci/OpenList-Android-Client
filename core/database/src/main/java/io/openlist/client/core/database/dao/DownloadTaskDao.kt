@@ -12,8 +12,19 @@ interface DownloadTaskDao {
     @Query("SELECT * FROM download_tasks WHERE instanceId = :instanceId ORDER BY createdAt DESC")
     fun observeByInstance(instanceId: String): Flow<List<DownloadTaskEntity>>
 
+    /** Rows DownloadManager might still be working on — P9's status-refresh
+     * only needs to query these, never the ones already at a terminal status. */
+    @Query("SELECT * FROM download_tasks WHERE instanceId = :instanceId AND status NOT IN ('SUCCESS', 'FAILED', 'CANCELLED')")
+    suspend fun getActiveByInstance(instanceId: String): List<DownloadTaskEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(task: DownloadTaskEntity)
+
+    @Query(
+        "UPDATE download_tasks SET status = :status, progress = :progress, errorMessage = :errorMessage, " +
+            "localUri = :localUri, updatedAt = :updatedAt WHERE id = :id",
+    )
+    suspend fun updateStatus(id: String, status: String, progress: Int?, errorMessage: String?, localUri: String?, updatedAt: Long)
 
     @Query("DELETE FROM download_tasks WHERE instanceId = :instanceId")
     suspend fun deleteByInstanceId(instanceId: String)

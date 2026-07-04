@@ -5,7 +5,10 @@ import io.openlist.client.core.common.DomainError
 import io.openlist.client.core.database.dao.DownloadTaskDao
 import io.openlist.client.core.database.dao.FileCacheDao
 import io.openlist.client.core.database.dao.InstanceDao
+import io.openlist.client.core.database.dao.RemoteTaskDao
+import io.openlist.client.core.database.dao.SearchHistoryDao
 import io.openlist.client.core.database.dao.SessionDao
+import io.openlist.client.core.database.dao.ShareDao
 import io.openlist.client.core.database.dao.UploadTaskDao
 import io.openlist.client.core.database.entity.InstanceEntity
 import io.openlist.client.core.domain.InstanceRepository
@@ -26,6 +29,9 @@ class InstanceRepositoryImpl @Inject constructor(
     private val fileCacheDao: FileCacheDao,
     private val downloadTaskDao: DownloadTaskDao,
     private val uploadTaskDao: UploadTaskDao,
+    private val shareDao: ShareDao,
+    private val searchHistoryDao: SearchHistoryDao,
+    private val remoteTaskDao: RemoteTaskDao,
     private val clientFactory: OpenListClientFactory,
 ) : InstanceRepository {
 
@@ -77,6 +83,9 @@ class InstanceRepositoryImpl @Inject constructor(
         // deleted instance's worker fails its own instance lookup on its next
         // step and stops there.
         uploadTaskDao.deleteByInstanceId(id)
+        shareDao.deleteByInstanceId(id)
+        searchHistoryDao.deleteByInstanceId(id)
+        remoteTaskDao.deleteByInstanceId(id)
         dao.deleteById(id)
     }
 

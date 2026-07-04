@@ -10,7 +10,11 @@ import io.openlist.client.feature.files.FileDetailScreen
 import io.openlist.client.feature.files.FileListScreen
 import io.openlist.client.feature.instance.AddInstanceScreen
 import io.openlist.client.feature.instance.InstanceListScreen
+import io.openlist.client.feature.search.SearchScreen
 import io.openlist.client.feature.settings.SettingsScreen
+import io.openlist.client.feature.share.ShareDetailScreen
+import io.openlist.client.feature.share.ShareListScreen
+import io.openlist.client.feature.task.TaskCenterScreen
 
 @Composable
 fun OpenListNavHost(navController: NavHostController = rememberNavController()) {
@@ -56,6 +60,9 @@ fun OpenListNavHost(navController: NavHostController = rememberNavController()) 
                 onBackToInstances = {
                     navController.navigate(Routes.INSTANCE_LIST) { popUpTo(0) }
                 },
+                onOpenShareList = { navController.navigate(Routes.shareList(instanceId)) },
+                onOpenSearch = { path -> navController.navigate(Routes.search(instanceId, path)) },
+                onOpenTaskCenter = { navController.navigate(Routes.taskCenter(instanceId)) },
             )
         }
         composable(Routes.FILE_DETAIL) {
@@ -65,6 +72,32 @@ fun OpenListNavHost(navController: NavHostController = rememberNavController()) 
             SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onOpenInstances = { navController.navigate(Routes.INSTANCE_LIST) { popUpTo(0) } },
+                onOpenTaskCenter = { instanceId -> navController.navigate(Routes.taskCenter(instanceId)) },
+            )
+        }
+        composable(Routes.SHARE_LIST) { backStackEntry ->
+            val instanceId = backStackEntry.arguments?.getString("instanceId") ?: return@composable
+            ShareListScreen(
+                onBack = { navController.popBackStack() },
+                onOpenShareDetail = { shareId -> navController.navigate(Routes.shareDetail(instanceId, shareId)) },
+            )
+        }
+        composable(Routes.SHARE_DETAIL) {
+            ShareDetailScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.SEARCH) { backStackEntry ->
+            val instanceId = backStackEntry.arguments?.getString("instanceId") ?: return@composable
+            SearchScreen(
+                onBack = { navController.popBackStack() },
+                onOpenDirectory = { path -> navController.navigate(Routes.fileList(instanceId, path)) },
+                onOpenFileDetail = { path -> navController.navigate(Routes.fileDetail(instanceId, path)) },
+            )
+        }
+        composable(Routes.TASK_CENTER) { backStackEntry ->
+            val instanceId = backStackEntry.arguments?.getString("instanceId") ?: return@composable
+            TaskCenterScreen(
+                onBack = { navController.popBackStack() },
+                onOpenDirectory = { path -> navController.navigate(Routes.fileList(instanceId, path)) },
             )
         }
     }

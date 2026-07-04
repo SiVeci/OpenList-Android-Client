@@ -1,5 +1,35 @@
 # Release Notes
 
+## v0.3.0 — 分享 / 搜索 / 任务中心版
+
+范围定义见 [v0.3_PRD.md](v0.3_PRD.md)，执行过程见 [v0.3_EXECUTION_PLAN.md](v0.3_EXECUTION_PLAN.md)。
+
+### 新增功能
+
+- **分享**：从文件菜单/文件详情页创建分享（路径只读、名称、密码可空、过期时间快捷项 永久/1天/7天/30天/自定义、启用开关）；分享列表/详情查看；修改、启用、禁用、删除（危险操作二次确认）；复制链接/密码/完整分享文案，调用 Android 系统分享面板。分享密码按后端本身的明文契约存储，日志脱敏。
+- **搜索**：文件列表顶栏搜索入口，支持"当前目录"/"全局"范围切换，IME 提交（非自动防抖搜索）；搜索历史按实例隔离，上限 20 条，支持删除/清空；结果可进入目录、打开详情，未建立索引的实例显示专属"搜索不可用"提示。
+- **任务中心**：统一入口（文件列表顶栏、设置页）聚合上传/下载/远程任务，"全部/上传/下载/远程"分栏；远程任务（离线下载、离线下载转存、复制、移动）4 秒轮询（仅在有运行中/等待中远程任务时轮询，离开页面即停）；远程任务可取消（二次确认）；完成任务可跳转目标目录。
+- **离线下载**：任务中心 FAB 提交（URL 校验、目标目录复用现有目录选择器、下载工具单工具时自动隐藏选择器），提交成功后任务立即出现在任务中心。
+- **下载状态回读**：本地下载任务不再只停在"已入队"——任务中心可见时通过 `DownloadManager.query()` 与 `ACTION_DOWNLOAD_COMPLETE` 广播双通道回读真实完成/失败状态。
+
+### 技术
+
+- **再拆 3 个模块**：新增 `:feature:{share,search,task}`，`:app` 内 share/task 的 Reserved 占位包按既定约定完成 graduate。
+- **Room Migration 6→7**：新增 `shares`、`search_history`（唯一索引去重历史）、`remote_tasks` 三表，迁移 SQL 与 Room 自身导出的 schema JSON 逐字段核对；实例删除级联清理扩展到三新表。
+- **5 个新 Repository**：`ShareRepository`/`SearchRepository`/`TaskRepository`/`OfflineDownloadRepository`/`TaskAggregationRepository`（本地上传/下载/远程任务三源合并为统一 `UnifiedTask` 流，按"运行中 > 等待 > 失败 > 完成"排序）。
+- **后端字段以源码为准**：`OpenListApi` 新增的 share/search/task/offline_download DTO 字段直接对照 `openlist-ref` 参考后端源码（`handles/sharing.go`、`handles/search.go`、`handles/task.go`、`handles/offline_download.go`、`router.go`）核对，而非按文档推测；`SearchNode`/`tache.State`/`delete_policy` 等字段在参考源码中不可得的部分，保留为文档标注的待真机核对项（见"已知限制"）。
+- **`DomainError` 新增** `SearchNotAvailable`、`ShareNotFound` 两个子类。
+
+### 已知限制
+
+见 [KNOWN_ISSUES.md](KNOWN_ISSUES.md)。
+
+### 下一步
+
+见 [v0.3_PRD.md](v0.3_PRD.md) 中记录的 v0.4/v0.5 预留（预览、管理台）。
+
+---
+
 ## v0.2.0 — 上传与文件操作闭环版
 
 范围定义见 [v0.2_PRD.md](v0.2_PRD.md)，执行过程见 [v0.2_EXECUTION_PLAN.md](v0.2_EXECUTION_PLAN.md)。
