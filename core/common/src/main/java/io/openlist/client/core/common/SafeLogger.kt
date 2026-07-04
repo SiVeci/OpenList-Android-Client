@@ -17,6 +17,12 @@ object SafeLogger {
         Regex("(?i)cookie"),
         Regex("(?i)set-cookie"),
         Regex("(?i)password"),
+        // v0.4 S5-T1: signed /d//p/ media URLs carry a `sign` query parameter
+        // that is itself a bearer credential (V-401/V-402) — must be redacted
+        // like any other sensitive key. `\b` word boundaries are load-bearing
+        // here: a bare "(?i)sign" would also match the "sign" substring inside
+        // unrelated keys/words such as "designation" or "assignment".
+        Regex("(?i)\\bsign\\b"),
     )
 
     fun d(tag: String, message: String) {

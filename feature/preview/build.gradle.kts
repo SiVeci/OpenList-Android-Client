@@ -71,4 +71,6 @@ dependencies {
     implementation(libs.markwon.core)
 
     testImplementation(libs.junit)
+    testImplementation(libs.mockk)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

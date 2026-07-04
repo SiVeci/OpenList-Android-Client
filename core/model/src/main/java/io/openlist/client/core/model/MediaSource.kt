@@ -18,6 +18,17 @@ data class MediaSource(
     val headersRequired: Boolean,
     val expiresAt: Long?,
     val subtitles: List<SubtitleCandidate>,
+    /** Already-computed, host-validated HTTP headers ready to hand straight
+     * to ExoPlayer's `DataSource.Factory` (v0.4_EXECUTION_PLAN.md §11 S5-T1,
+     * PRD §10.4) — the *result* of `buildScopedHttpHeaders`, computed once by
+     * `MediaRepositoryImpl` at resolve time so no UI-layer code ever needs
+     * its own path to `TokenProvider`/instance base URLs (architecture rule:
+     * `:feature:preview` only depends on `core:{domain,designsystem,model,common}`).
+     * [headersRequired] remains the separate "does this source theoretically
+     * need an auth header" marker; this field is "what to actually attach,
+     * already scoped to the right host". Defaults to empty for
+     * backward-compatible construction. */
+    val headers: Map<String, String> = emptyMap(),
 )
 
 /** Where a [SubtitleCandidate] came from — whether `SubtitleRepository.findCandidates`

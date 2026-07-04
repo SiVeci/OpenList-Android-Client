@@ -10,7 +10,7 @@ import io.openlist.client.feature.files.FileDetailScreen
 import io.openlist.client.feature.files.FileListScreen
 import io.openlist.client.feature.instance.AddInstanceScreen
 import io.openlist.client.feature.instance.InstanceListScreen
-import io.openlist.client.feature.preview.MediaPlayerPlaceholderScreen
+import io.openlist.client.feature.preview.MediaPlayerScreen
 import io.openlist.client.feature.preview.PreviewScreen
 import io.openlist.client.feature.search.SearchScreen
 import io.openlist.client.feature.settings.SettingsScreen
@@ -124,7 +124,11 @@ fun OpenListNavHost(navController: NavHostController = rememberNavController()) 
             val path = backStackEntry.arguments?.getString("path")
                 ?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }
                 ?: "/"
-            MediaPlayerPlaceholderScreen(instanceId = instanceId, path = path)
+            MediaPlayerScreen(
+                instanceId = instanceId,
+                path = path,
+                onBack = { navController.popBackStack() },
+            )
         }
     }
 }
