@@ -1,10 +1,13 @@
 package io.openlist.client.data.repository
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import io.openlist.client.core.common.ApiResult
 import io.openlist.client.core.common.DomainError
 import io.openlist.client.core.database.dao.DownloadTaskDao
 import io.openlist.client.core.database.dao.FileCacheDao
 import io.openlist.client.core.database.dao.InstanceDao
+import io.openlist.client.core.database.dao.PreviewCacheDao
 import io.openlist.client.core.database.dao.RemoteTaskDao
 import io.openlist.client.core.database.dao.SearchHistoryDao
 import io.openlist.client.core.database.dao.SessionDao
@@ -18,6 +21,7 @@ import io.openlist.client.core.network.OpenListClientFactory
 import io.openlist.client.core.network.safeApiCall
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.io.File
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,7 +36,9 @@ class InstanceRepositoryImpl @Inject constructor(
     private val shareDao: ShareDao,
     private val searchHistoryDao: SearchHistoryDao,
     private val remoteTaskDao: RemoteTaskDao,
+    private val previewCacheDao: PreviewCacheDao,
     private val clientFactory: OpenListClientFactory,
+    @ApplicationContext private val context: Context,
 ) : InstanceRepository {
 
     override fun observeAll(): Flow<List<Instance>> =
@@ -86,6 +92,13 @@ class InstanceRepositoryImpl @Inject constructor(
         shareDao.deleteByInstanceId(id)
         searchHistoryDao.deleteByInstanceId(id)
         remoteTaskDao.deleteByInstanceId(id)
+        previewCacheDao.deleteByInstanceId(id)
+        // Preview content bodies live under cacheDir/preview/<instanceId>/, not
+        // in any DAO-owned table (P-415), so the on-disk cache is cleaned up
+        // directly here too — best-effort, matching the rest of this method's
+        // no-rollback cleanup style (a partially-cleaned cache dir is harmless,
+        // it just gets recreated/overwritten on the next preview).
+        File(context.cacheDir, "preview/$id").deleteRecursively()
         dao.deleteById(id)
     }
 

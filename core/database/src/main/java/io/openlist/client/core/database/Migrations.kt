@@ -103,3 +103,40 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
         )
     }
 }
+
+/**
+ * Adds `preview_cache` (v0.4 Sprint 1, S1-T2, P-415). Column order/types
+ * hand-derived from `PreviewCacheEntity` and cross-checked field-by-field
+ * against the hand-written `8.json` schema export added alongside this
+ * migration — same cross-check discipline as MIGRATION_5_6/MIGRATION_6_7,
+ * but **unlike** those two, this one could not be verified by actually
+ * running Room's KSP schema export (no build environment available in this
+ * sprint): it is a manual derivation from the Kotlin -> SQLite type mapping
+ * used elsewhere in this file (String -> TEXT, Long -> INTEGER, nullable
+ * Kotlin types omit `NOT NULL`). Re-verify against a real KSP-exported
+ * schema the next time this module is built.
+ */
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `preview_cache` (" +
+                "`id` TEXT NOT NULL, " +
+                "`instanceId` TEXT NOT NULL, " +
+                "`path` TEXT NOT NULL, " +
+                "`kind` TEXT NOT NULL, " +
+                "`mimeType` TEXT, " +
+                "`lastModified` INTEGER, " +
+                "`cacheKey` TEXT NOT NULL, " +
+                "`localFilePath` TEXT NOT NULL, " +
+                "`sizeBytes` INTEGER NOT NULL, " +
+                "`etag` TEXT, " +
+                "`expiresAt` INTEGER, " +
+                "`cachedAt` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`id`))",
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_preview_cache_instanceId_path_kind` " +
+                "ON `preview_cache` (`instanceId`, `path`, `kind`)",
+        )
+    }
+}

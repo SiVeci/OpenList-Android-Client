@@ -16,6 +16,16 @@ sealed class DomainError {
     data object SearchNotAvailable : DomainError()
     /** A share id no longer resolves (deleted, or never existed). */
     data object ShareNotFound : DomainError()
+    /** File exceeds the preview size cap (v0.4_EXECUTION_PLAN.md §11, S1-T4). */
+    data object PreviewTooLarge : DomainError()
+    /** No in-app player/renderer can handle this media format. */
+    data object MediaUnsupported : DomainError()
+    /** A previously-resolved MediaSource/PreviewUrl's URL is no longer valid
+     * (core:common has no dependency on core:model, so this is deliberately
+     * not a KDoc `[...]` link to those types). */
+    data object MediaSourceExpired : DomainError()
+    /** No installed app (and no web fallback) can open this file externally. */
+    data object ExternalOpenUnavailable : DomainError()
     data class OpenListError(val code: Int?, val message: String) : DomainError()
     data class Unknown(val throwable: Throwable?) : DomainError()
 }
@@ -35,6 +45,10 @@ fun DomainError.toUserMessage(): String = when (this) {
     DomainError.PathEncodeError -> "路径解析失败"
     DomainError.SearchNotAvailable -> "该实例未启用搜索索引"
     DomainError.ShareNotFound -> "分享不存在或已被删除"
+    DomainError.PreviewTooLarge -> "文件过大，无法预览"
+    DomainError.MediaUnsupported -> "该格式暂不支持播放"
+    DomainError.MediaSourceExpired -> "播放地址已失效，请重试"
+    DomainError.ExternalOpenUnavailable -> "没有可处理该文件的应用"
     is DomainError.OpenListError -> message.ifBlank { "请求失败${code?.let { " ($it)" } ?: ""}" }
     is DomainError.Unknown -> "出现未知错误，请重试"
 }

@@ -10,6 +10,8 @@ import io.openlist.client.feature.files.FileDetailScreen
 import io.openlist.client.feature.files.FileListScreen
 import io.openlist.client.feature.instance.AddInstanceScreen
 import io.openlist.client.feature.instance.InstanceListScreen
+import io.openlist.client.feature.preview.MediaPlayerPlaceholderScreen
+import io.openlist.client.feature.preview.PreviewPlaceholderScreen
 import io.openlist.client.feature.search.SearchScreen
 import io.openlist.client.feature.settings.SettingsScreen
 import io.openlist.client.feature.share.ShareDetailScreen
@@ -99,6 +101,20 @@ fun OpenListNavHost(navController: NavHostController = rememberNavController()) 
                 onBack = { navController.popBackStack() },
                 onOpenDirectory = { path -> navController.navigate(Routes.fileList(instanceId, path)) },
             )
+        }
+        composable(Routes.PREVIEW) { backStackEntry ->
+            val instanceId = backStackEntry.arguments?.getString("instanceId") ?: return@composable
+            val path = backStackEntry.arguments?.getString("path")
+                ?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }
+                ?: "/"
+            PreviewPlaceholderScreen(instanceId = instanceId, path = path)
+        }
+        composable(Routes.MEDIA_PLAYER) { backStackEntry ->
+            val instanceId = backStackEntry.arguments?.getString("instanceId") ?: return@composable
+            val path = backStackEntry.arguments?.getString("path")
+                ?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }
+                ?: "/"
+            MediaPlayerPlaceholderScreen(instanceId = instanceId, path = path)
         }
     }
 }

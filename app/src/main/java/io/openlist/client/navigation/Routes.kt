@@ -18,6 +18,8 @@ object Routes {
     const val SHARE_DETAIL = "share_detail/{instanceId}/{shareId}"
     const val SEARCH = "search/{instanceId}?path={path}"
     const val TASK_CENTER = "task_center/{instanceId}"
+    const val PREVIEW = "preview/{instanceId}?path={path}"
+    const val MEDIA_PLAYER = "player/{instanceId}?path={path}"
 
     fun login(instanceId: String) = "login/$instanceId"
     fun fileList(instanceId: String, path: String = "/") = "files/$instanceId?path=${encodePathArg(path)}"
@@ -26,6 +28,8 @@ object Routes {
     fun shareDetail(instanceId: String, shareId: String) = "share_detail/$instanceId/$shareId"
     fun search(instanceId: String, path: String = "/") = "search/$instanceId?path=${encodePathArg(path)}"
     fun taskCenter(instanceId: String) = "task_center/$instanceId"
+    fun preview(instanceId: String, path: String) = "preview/$instanceId?path=${encodePathArg(path)}"
+    fun mediaPlayer(instanceId: String, path: String) = "player/$instanceId?path=${encodePathArg(path)}"
 
     private fun encodePathArg(path: String) =
         java.net.URLEncoder.encode(path, "UTF-8")

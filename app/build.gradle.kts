@@ -103,6 +103,7 @@ dependencies {
     implementation(project(":feature:share"))
     implementation(project(":feature:search"))
     implementation(project(":feature:task"))
+    implementation(project(":feature:preview"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -132,8 +133,6 @@ dependencies {
 
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
-
-    implementation(libs.coil.compose)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

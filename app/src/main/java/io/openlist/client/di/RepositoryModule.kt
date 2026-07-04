@@ -6,24 +6,32 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import io.openlist.client.core.domain.AuthRepository
 import io.openlist.client.core.domain.DirectoryPickerRepository
+import io.openlist.client.core.domain.ExternalOpenRepository
 import io.openlist.client.core.domain.FileOperationRepository
 import io.openlist.client.core.domain.FilesRepository
 import io.openlist.client.core.domain.InstanceRepository
+import io.openlist.client.core.domain.MediaRepository
 import io.openlist.client.core.domain.OfflineDownloadRepository
+import io.openlist.client.core.domain.PreviewRepository
 import io.openlist.client.core.domain.SearchRepository
 import io.openlist.client.core.domain.ShareRepository
+import io.openlist.client.core.domain.SubtitleRepository
 import io.openlist.client.core.domain.TaskAggregationRepository
 import io.openlist.client.core.domain.TaskRepository
 import io.openlist.client.core.domain.TransferRepository
 import io.openlist.client.core.domain.UploadRepository
 import io.openlist.client.data.repository.AuthRepositoryImpl
 import io.openlist.client.data.repository.DirectoryPickerRepositoryImpl
+import io.openlist.client.data.repository.ExternalOpenRepositoryImpl
 import io.openlist.client.data.repository.FileOperationRepositoryImpl
 import io.openlist.client.data.repository.FilesRepositoryImpl
 import io.openlist.client.data.repository.InstanceRepositoryImpl
+import io.openlist.client.data.repository.MediaRepositoryImpl
 import io.openlist.client.data.repository.OfflineDownloadRepositoryImpl
+import io.openlist.client.data.repository.PreviewRepositoryImpl
 import io.openlist.client.data.repository.SearchRepositoryImpl
 import io.openlist.client.data.repository.ShareRepositoryImpl
+import io.openlist.client.data.repository.SubtitleRepositoryImpl
 import io.openlist.client.data.repository.TaskAggregationRepositoryImpl
 import io.openlist.client.data.repository.TaskRepositoryImpl
 import io.openlist.client.data.repository.TransferRepositoryImpl
@@ -80,4 +88,20 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindTaskAggregationRepository(impl: TaskAggregationRepositoryImpl): TaskAggregationRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindPreviewRepository(impl: PreviewRepositoryImpl): PreviewRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindMediaRepository(impl: MediaRepositoryImpl): MediaRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSubtitleRepository(impl: SubtitleRepositoryImpl): SubtitleRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindExternalOpenRepository(impl: ExternalOpenRepositoryImpl): ExternalOpenRepository
 }
