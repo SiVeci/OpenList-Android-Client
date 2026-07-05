@@ -127,7 +127,12 @@ data class AdminIndexProgressDto(
 )
 
 /** `POST /api/admin/index/update` request body. Source:
- * `server/handles/index.go` `UpdateIndexReq`. */
+ * `server/handles/index.go` `UpdateIndexReq`. [maxDepth] default here is just
+ * this DTO's Go-zero-value fallback if a caller somehow skips the argument --
+ * `AdminIndexRepository.updateIndex`'s own default (`-1`, DEC-504/S6) is what
+ * actually reaches the backend in practice; see that interface's KDoc for why
+ * `0` (this DTO's default) is a *depth-0/no-recursion* request, not "no
+ * limit". */
 @Serializable
 data class AdminIndexUpdateReq(
     val paths: List<String> = listOf("/"),

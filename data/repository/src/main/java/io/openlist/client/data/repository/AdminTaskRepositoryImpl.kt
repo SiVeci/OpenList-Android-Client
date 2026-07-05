@@ -15,7 +15,6 @@ import io.openlist.client.core.network.OpenListClientFactory
 import io.openlist.client.core.network.dto.ApiResponse
 import io.openlist.client.core.network.dto.TaskInfoDto
 import io.openlist.client.core.network.safeApiCall
-import io.openlist.client.core.network.toDomainError
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -152,32 +151,10 @@ class AdminTaskRepositoryImpl @Inject constructor(
         return result
     }
 
-    /**
-     * Like [io.openlist.client.core.network.safeApiCallUnit], but every
-     * non-2xx/non-401 failure is kept as [DomainError.OpenListError] (backend
-     * `message` verbatim) instead of the shared mapping's bucketed
-     * [DomainError.ServerError] -- V-505 confirms cancel/retry/delete
-     * validation happens deep in the task manager and its failure message is
-     * exactly what PRD §14.2 requires reaching the UI. This is the same
-     * pattern [AdminStorageRepositoryImpl] introduced in S4 for
-     * enable/disable/load_all; kept as a small private duplicate here rather
-     * than extracted to a shared location, since extraction isn't warranted
-     * yet for two call sites (brief's explicitly allowed option).
-     */
-    private suspend fun safeAdminOperationCall(block: suspend () -> ApiResponse<*>): ApiResult<Unit> {
-        return try {
-            val response = block()
-            if (response.code in 200..299) {
-                ApiResult.Success(Unit)
-            } else if (response.code == 401) {
-                ApiResult.Failure(DomainError.Unauthorized)
-            } else {
-                ApiResult.Failure(DomainError.OpenListError(response.code, response.message))
-            }
-        } catch (t: Throwable) {
-            ApiResult.Failure(t.toDomainError())
-        }
-    }
+    // `safeAdminOperationCall` (shared with [AdminStorageRepositoryImpl]/S4,
+    // [AdminIndexRepositoryImpl]/S6 -- extracted to `AdminOperationSupport.kt`
+    // in S6 once a third call site made "small private duplicate" no longer
+    // the simpler option; see that file's KDoc for the full rationale).
 
     private suspend fun apiFor(instanceId: String) = instanceRepository.getById(instanceId)?.let { instance ->
         instanceContext.set(InstanceScope(instance.id, instance.baseUrl))

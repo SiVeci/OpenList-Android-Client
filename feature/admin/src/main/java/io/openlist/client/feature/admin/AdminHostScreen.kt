@@ -102,8 +102,9 @@ private fun AdminAccessDeniedScreen(
 /**
  * ALLOWED-only scaffold: top bar (shows current instance name per PRD §12.1
  * "避免跨实例误操作"), scrollable [AdminTabRow] (7 tabs), and the selected
- * tab's content. Only [AdminTab.OVERVIEW] has real content this Sprint; the
- * other 6 render [AdminComingSoon].
+ * tab's content. [AdminTab.OVERVIEW]/[AdminTab.USERS]/[AdminTab.STORAGES]/
+ * [AdminTab.TASKS]/[AdminTab.INDEX] have real content as of S6; [AdminTab
+ * .SETTINGS]/[AdminTab.ADVANCED] still render [AdminComingSoon] (S7 scope).
  */
 @Composable
 private fun AdminScaffold(
@@ -143,6 +144,7 @@ private fun AdminScaffold(
                 AdminTab.USERS -> AdminUserTab(instanceId = instanceId)
                 AdminTab.STORAGES -> AdminStorageTab(instanceId = instanceId)
                 AdminTab.TASKS -> AdminTaskTab(instanceId = instanceId)
+                AdminTab.INDEX -> AdminIndexTab(instanceId = instanceId)
                 else -> AdminComingSoon(tab = uiState.selectedTab)
             }
         }

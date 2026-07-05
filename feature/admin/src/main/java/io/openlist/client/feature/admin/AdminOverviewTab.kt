@@ -28,9 +28,10 @@ import io.openlist.client.core.designsystem.Spacing
  * during gating); the three summary cards each own an independent
  * [AdminCardState] slice so one card's failure/loading never blocks the
  * others or the instance-info block from rendering (PRD §16.3.4/P-512) --
- * `AdminStorageRepository`/`AdminTaskRepository`/`AdminIndexRepository` are
- * still S1 stubs, so all three legitimately show their error state this
- * Sprint (S4/S5/S6 "light up" real data later).
+ * `AdminStorageRepository`/`AdminTaskRepository` were "lit up" with real data
+ * in S4/S5, and `AdminIndexRepository` in S6 (this file itself needed no
+ * changes for that -- see `AdminViewModel.refreshIndexSummary`, which already
+ * called the real interface method starting S2).
  */
 @Composable
 fun AdminOverviewTab(
