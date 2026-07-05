@@ -1,5 +1,44 @@
 # Release Notes
 
+## v0.5.0 — 轻量管理台版
+
+范围定义见 [v0.5_PRD.md](v0.5_PRD.md)，执行过程见 [v0.5_EXECUTION_PLAN.md](v0.5_EXECUTION_PLAN.md)，Sprint 记录见 [v0.5_IMPLEMENTATION_LOG.md](v0.5_IMPLEMENTATION_LOG.md)，验收见 [v0.5_ACCEPTANCE_REPORT.md](v0.5_ACCEPTANCE_REPORT.md)。
+
+### 新增功能
+
+- **管理员门控**：设置页新增「管理台」入口行，跟随当前实例与登录身份显示三种状态（隐藏/禁用说明/可进入）；进入 `ADMIN` 路由即强制 `checkAccess`（重新拉取 `/api/me`），非管理员/游客/会话失效均在门控页拦截，零管理接口请求。
+- **管理台概览**：实例信息（零请求）+ 存储/任务/索引三张摘要卡（各自独立加载、独立降级）+ Web 兜底入口卡。
+- **用户查看**：分页列表 + 只读详情（用户名/角色/禁用状态/基础路径/权限摘要），无编辑入口，密码等敏感字段结构性不存在于领域模型。
+- **存储查看与启停**：列表 + 详情（含 `mount_details` 独立加载态与超时降级）；存储启用/禁用（二次确认，禁用为危险样式）；重新加载全部存储（二次确认）；成功后精确/保守失效对应的文件与预览缓存。
+- **驱动信息只读**：驱动列表/名称/详情信息展示（存储详情内的二级 Sheet）。
+- **管理任务扩展**：覆盖后端全部 7 类任务（`upload`/`copy`/`move`/`offline_download`/`offline_download_transfer`/`decompress`/`decompress_upload`）的 undone/done 查看、详情、取消、重试（限失败）、删除记录（限已完成类），4 秒轮询（仅可见+有运行中任务时，连续失败 3 次自动停止）；与既有任务中心（`:feature:task`）完全独立，普通视角行为与请求量零变化。
+- **索引管理**：进度查看（对象数/运行状态/上次完成时间/错误）+ 构建/更新/停止/清空四操作（清空为危险样式），3~5 秒轮询（仅可见+运行中）。
+- **设置查看**：按 12 个 Group 分组的只读列表 + 默认设置对比（`FilterChip` 切换）；私密项（`flag=PRIVATE` 或 key 命中 token/secret/password/key 关键字）掩码展示，值在写入缓存前已置空，无保存/删除/重置 Token 入口。
+- **Web 管理台兜底**：构造 `{baseUrl}/@manage` 链接，外部浏览器打开（`ACTION_VIEW`），无接收方时可复制链接；不注入 Token，URL 恒与当前实例同源。
+
+### 技术
+
+- **新增 `:feature:admin` 模块**：graduate 自 `:app` 内的占位包，依赖单向指向 `core:{common,model,domain,designsystem}`，不依赖任何其他 feature；`:feature:webfallback` 占位包按 DEC-502 保留，未升级为真实模块。
+- **Room Migration 8→9**：新增 `admin_cache` 通用缓存表（`instanceId/scope/cacheKey/rawJson/cachedAt` + 唯一索引），只缓存用户/存储/设置三类慢变数据（TTL 分别为 1 分钟/30 秒/5 分钟），任务与索引进度不入库；`rawJson` 只存领域模型序列化结果，从结构上不可能包含敏感字段；`InstanceRepositoryImpl.delete` 级联清理该表。
+- **7 个新 Repository**：`AdminGateRepository`/`AdminUserRepository`/`AdminStorageRepository`/`AdminTaskRepository`/`AdminIndexRepository`/`AdminSettingsRepository`/`AdminWebFallbackRepository`，均遵循既有 instance 查找/401 失效处理模式；管理任务独立内存态 StateFlow，不写 `remote_tasks` 表。
+- **`DomainError` 新增** `AdminAccessDenied`/`AdminApiUnavailable` 两个子类；操作类失败（存储启停/任务操作/索引操作）经 `OpenListError` 原样透传后端 message。
+- **后端接口对照**：本轮重新获取 `openlist-ref/` 源码并首次覆盖 admin handlers（`handles/{user,storage,driver,setting,index,task}.go`、`server/router.go`），V-501~V-510 全部有一手源码依据，非 provisional；管理员判定沿用现有 `role`/`isAdmin`；`AuthAdmin` 中间件确认为 HTTP 200 + `body.code=403`（非独立 401/403 状态码），与既有 `ErrorMapping` 只看 `body.code` 的实现天然兼容。
+- **versionCode = 5，versionName = "0.5.0"**。
+
+### 安全审计
+
+S8 阶段两个独立静态审计（缓存/多实例隔离/敏感字段、权限门控/日志脱敏/回归面）均未发现问题，详见 [v0.5_ACCEPTANCE_REPORT.md](v0.5_ACCEPTANCE_REPORT.md) §8。
+
+### 已知限制
+
+见 [KNOWN_ISSUES.md](KNOWN_ISSUES.md)。**本版本延续 DEC-506 的人工验证 caveat**：本轮开发环境无 Android 真机/模拟器，Room 8→9 真实升级路径、`/@manage` 真实可达性、外部浏览器实际弹出行为等均待发布前人工核对；本轮版本号提升后已重新执行 `assembleDebug`/`testDebugUnitTest` 并确认 BUILD SUCCESSFUL（区别于 v0.4 完全没有编译过一次的更弱基线）。
+
+### 下一步
+
+见 [v0.5_PRD.md](v0.5_PRD.md) §18 记录的 v1.0（原子级对齐 + Parity Matrix）预留。
+
+---
+
 ## v0.4.0 — 预览与播放器版
 
 范围定义见 [v0.4_PRD.md](v0.4_PRD.md)，执行过程见 [v0.4_EXECUTION_PLAN.md](v0.4_EXECUTION_PLAN.md)，Sprint 记录见 [v0.4_IMPLEMENTATION_LOG.md](v0.4_IMPLEMENTATION_LOG.md)。

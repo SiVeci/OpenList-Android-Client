@@ -29,3 +29,25 @@
 - 每个版本只做该版本范围。
 - 后续功能只能做架构预留，不提前实现。
 - 遇到关键决策必须实时向用户汇报。
+
+### v0.5 轻量管理台（DEC-501~506，均于 S0 定稿，详见 `v0.5_EXECUTION_PLAN.md` §16.1）
+- DEC-501：重新获取 OpenList 后端参考源码（`openlist-ref/`），本次精简 checkout 首次覆盖 admin handlers（`handles/{user,storage,driver,setting,index,task}.go`、`server/router.go`、`model/{user,storage,setting}.go`），V-501~V-510 全部有一手源码依据，非 provisional。
+- DEC-502：`:feature:webfallback` 占位包不升级为真实模块，v0.5 Web 兜底能力放在 `:feature:admin` + `AdminWebFallbackRepository` 内；占位包继续保留给未来 SSO/WebAuthn。
+- DEC-503：Web 管理台兜底打开方式采用方案 A——外部浏览器（`ACTION_VIEW`），零新增依赖，天然无 JS Bridge/无 Token 注入面。
+- DEC-504：索引更新（`admin/index/update`）路径默认 `/`，不强制接目录选择器；目录选择器复用留作可选增强（未实现）。
+- DEC-505：管理任务采用方案 A——管理台内独立任务 Tab（`AdminTaskRepository`），与 `:feature:task`/现有任务中心零依赖，不做"任务中心内管理员视角开关"方案。
+- DEC-506：沿用 v0.3/v0.4 的"Accepted with manual-verification caveat"验收口径，按用户 S0 指示修正为——本轮构建/单测类验收项已实测通过（非纯静态审查），仅真机项（Room 8→9 真实升级路径、`/@manage` 真实可达性等）列为验收报告 caveat。
+
+### v0.5 推荐决策采纳（P-501~512，均按执行计划原样采纳，详见 `v0.5_EXECUTION_PLAN.md` §16.2）
+- P-501：`:feature:admin` graduate，删除 `:app` 内 admin 占位包。
+- P-502：单条 `ADMIN = "admin/{instanceId}?tab={tab}"` 宿主路由 + 7 Tab 内部状态；用户/存储/驱动详情用 BottomSheet，不加路由。
+- P-503：管理任务独立 `AdminTaskRepository` + 内存态 StateFlow 缓存，不写 `remote_tasks` 表；复用 `TaskInfoDto`/`TaskStateMapper`/`UnifiedTaskStatus`；既有 `TaskRepository` 零改动。
+- P-504：`admin_cache` 单表通用缓存（scope+cacheKey+rawJson），只缓存用户/存储/设置三类；任务与索引进度不入库。
+- P-505：门控实现为 ADMIN 路由进入即 `checkAccess`（强制 `/api/me` 刷新）；设置页入口仅做展示层预判；DENIED 态零 admin 请求。
+- P-506：存储启停缓存联动——enable/disable 按 mountPath 前缀精确失效（文件+预览缓存）；load_all 当前实例全清（保守策略）。
+- P-507：`admin_cache.rawJson` 只存领域模型序列化结果，不存后端原始响应，缓存层结构上不可能含敏感字段。
+- P-508：设置私密判定 = 后端 `flag` PRIVATE 语义 ∪ key 关键字（token/secret/password/key），双重判定宁可多脱敏。
+- P-509：轮询——任务 Tab 4 秒（仅 undone、仅可见+有运行中）；索引 Tab 3~5 秒（仅可见+running）；连续失败即停。
+- P-510：`DomainError` 只新增 `AdminAccessDenied`/`AdminApiUnavailable`；操作类失败经 `OpenListError` 透传 message；`WebFallbackUnavailable` 复用 `ExternalOpenUnavailable`+专属文案。
+- P-511：versionCode=5、appVersionName="0.5.0"（S8 落地，已确认）。
+- P-512：概览统计卡片按可选项处理，S2 只做结构骨架，随 S4/S5/S6 逐卡点亮，任何摘要失败独立降级。

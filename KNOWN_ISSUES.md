@@ -1,24 +1,41 @@
-# Known Issues (v0.4.0)
+# Known Issues (v0.5.0)
 
-v0.1/v0.2/v0.3 的已知限制见文末历史章节。以下是 v0.4 范围内已知的限制。
+v0.1~v0.4 的已知限制见文末历史章节。以下是 v0.5 范围内已知的限制。
 
-## 本轮开发环境约束（比 v0.3 更严格）
+## 本轮环境状态（比 v0.4 更强一档：本轮实际跑过构建）
 
-v0.3 当时至少还能跑 `compileDebugKotlin`/`assembleDebug`/`testDebugUnitTest` 做编译期验证。**v0.4 本轮开发环境额外禁止运行任何构建/测试命令**（资源受限的云端环境），也没有连接的 Android 设备/模拟器。因此 v0.4 的正确性验证**完全依赖静态代码审查**（类型/字段名/import 逐一核对、依赖方向核查、Room schema 手工核对、Media3 API 对照官方 GitHub 源码核实），**没有做过任何一次编译**，单元测试也只写未运行。这是 v0.4 验收口径的核心 caveat，比 v0.3 的"编译通过但未真机验证"更弱一档。
+v0.4 全程禁止运行任何构建/测试命令，一次编译都没有做过。**v0.5 本轮环境恢复了可运行 Gradle 的能力**：S0 起点即执行 `JAVA_HOME="C:/Program Files/Java/jdk-20" ./gradlew assembleDebug testDebugUnitTest` 确认 BUILD SUCCESSFUL，此后每个 Sprint 出口均以 `compileDebugKotlin`/`testDebugUnitTest` 实测通过为准（非纯静态审查），S8 版本号提升后（versionCode 4→5、versionName 0.4.0→0.5.0）重新跑过一次完整 `assembleDebug`/`testDebugUnitTest` 并确认 BUILD SUCCESSFUL。**但本轮仍然没有 Android 真机/模拟器**（`adb devices` 为空），因此"编译通过"与"真机运行正确"之间的 gap 仍然存在，性质与 v0.3 的验证口径相同（v0.4 是唯一连编译都没跑过的一轮）。
 
-## 未在真机/构建环境上验证的项目
+## 未在真机上验证的项目（发布前待验清单，详见 `v0.5_ACCEPTANCE_REPORT.md`）
 
-- **完全没有做过一次编译**：`:feature:preview` 新模块、Room 7→8 迁移、四个新 Repository、Media3/Markwon/Coil 集成，均未经 `compileDebugKotlin`/`kspDebugKotlin`（Hilt DI 图）验证，理论上仍可能存在本轮静态审查未发现的类型错误或 import 遗漏。
-- **Media3/ExoPlayer 实际播放效果**：视频/音频播放、`PlayerView` 默认控制条渲染、横屏沉浸式切换、字幕轨道实际渲染、音频进度条视觉效果——全部未在真机/模拟器上验证，仅代码走查+对照 [androidx/media](https://github.com/androidx/media) 官方 `release`/`1.4.1` tag 源码核实 API 签名（`PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS`、`HttpDataSource.InvalidResponseCodeException`、`MimeTypes` 字幕常量、`@UnstableApi` 标注面等）。
-- **Markdown 渲染实际效果**（Markwon 4.6.2）：HTML 忽略行为、外链点击安全性已对照 Markwon 源码核实结论，但实际渲染排版、暗色模式适配未真机验证。
-- **图片预览/Coil 缓存**：加载失败态、缓存命中效果未真机验证。
-- **v0.4 全部新页面**（预览宿主页、图片/文本/Markdown 预览页、视频/音频播放器页、字幕选择 Sheet、外部打开 Sheet）的实际渲染、交互、暗色模式——DESIGN 验收②未做人工走查。
-- **Room 7→8 真实升级路径**（v0.3.0 APK 已有数据 → v0.4 APK 打开后数据保留且 `preview_cache` 新表可用）；`8.json` schema 导出文件的 `identityHash` 是手工填的占位值，需要在可构建环境下重新用 KSP 实际导出核对（详见 `v0.4_IMPLEMENTATION_LOG.md` S1 章节）。
-- 沿用 v0.3 已知的：分享全闭环真实往返、搜索实际行为、任务中心轮询真机耗电、下载状态回读真机表现——均未在本轮重新验证（v0.4 未改动这些既有功能的核心逻辑，只新增了预览分发接线）。
+- **Room 8→9 真实升级路径**：v0.4.0 APK 已有数据 → v0.5 APK 打开后数据保留且 `admin_cache` 新表可用，仍需真机验证（这一步本轮环境无法做，无 Android 设备/模拟器）。**schema 结构本身已用 KSP 核对并修复**：S8 验收阶段执行 `:core:database:kspDebugKotlin` 强制重新生成 `9.json`，与手工推导的已提交版本逐字段比对**结果完全一致**，仅 `identityHash` 从占位符变为真实值；已将真实值 **`edad8842c1f0268bcb41ace48375b2d7`** 写回并提交至仓库的 `9.json`，不再是占位符。`8.json`（v0.4 遗留）的 `identityHash` 占位符 `PLACEHOLDER_UNVERIFIED_8_00000000000000` **无法在本轮修复**：KSP 只导出「当前」数据库版本（9）的 schema，要重新核对 8 版本需要临时把 `OpenListDatabase` 版本降回 8 重新编译，这个改动侵入性太大、风险不匹配收益，故保留原占位符，留待下次真正修改该版本 schema（不会发生，8 已是历史版本）或有更完整工具链时处理，不阻塞发布。剩下的唯一 gap 是真机上的实际迁移执行（表结构创建、旧数据保留），非 schema 描述本身的正确性。
+- **`/@manage` 路径的真实可达性与页面渲染**：V-508 已从源码（`server/static/static.go:220`）确认路径本身存在，但未在真实部署的 OpenList 实例上实际打开验证。
+- **外部浏览器 Intent 的真机弹出行为**：分享面板 vs 直接跳转，取决于设备默认浏览器配置，未真机验证。
+- **`AdminUserSummary.otpEnabled` 字段仍是 provisional**：`openlist-ref` 源码未找到可确认的 2FA 状态字段，S1~S7 全程保守显示为"未知"而非猜测 `false`，需要真实管理员账号（已开启/未开启 2FA 两种）核对后端实际返回。
+- **索引 `updateIndex` 的 `maxDepth=-1` 默认值**：是本轮基于 `internal/fs/walk.go` 递归终止条件（`depth==0` 停止）推导的"尽力而为"默认值，非确认的后端契约；真机验证后如发现后端对负数 `maxDepth` 有钳制或报错行为，需要调整。
+- **设置分组的 12 个 Group 枚举中文命名**是否与真实后端返回的常见配置项分布相符（例如"其他"兜底分支覆盖率），未用真实实例核对。
+- **深色模式**：管理台新组件（`AdminScaffold`/`AdminTabRow`/`IndexProgressPanel`/`AdminUserDetailSheet`/`AdminStorageDetailSheet` 等）复用既有 designsystem token，但未做系统性人工暗色走查。
+- **存储 `status` 字段的健康判定阈值**（"work"字符串、大小写不敏感）为 S3 保守推导，真机验证后如与实际驱动行为不符需要校准（详见 `v0.5_IMPLEMENTATION_LOG.md` S3 决策记录第 4 条）。
+- 沿用 v0.4 已知的：Media3/ExoPlayer 实际播放效果、Markdown 渲染排版、图片预览/Coil 缓存等——均未在本轮重新验证（v0.5 未改动这些既有功能）。
 
-建议在自建 OpenList 实例 + 可构建环境 + 真机/模拟器上完整走一遍 `v0.4_EXECUTION_PLAN.md` §14 验收清单再发布，**第一步应该是先跑一次完整构建**（本轮从未做过）。
+建议在自建 OpenList 实例 + 真机/模拟器上完整走一遍 `v0.5_EXECUTION_PLAN.md` §14 验收清单再发布，重点覆盖上述"真机项"与 Room 8→9 真实升级路径。
 
-## v0.4 待真机核对的后端行为推测（V-401 ~ V-410）
+## 一般性观察（非 v0.5 引入的缺口，项目级别）
+
+- **项目全局没有配置 `HttpLoggingInterceptor`**：S8 安全审计确认这不是 v0.5 引入的新问题，而是自 v0.1 起就没有的组件（沿用既有的最小化日志面），一并记录供后续版本评估是否需要引入（引入时需同步设计 admin 接口响应体的脱敏策略）。
+
+## v1.0 Parity Matrix 预留材料（PRD §18.1，6 项，供 v1.0 建立完整 Parity Matrix 时直接引用）
+
+1. **用户管理**：v0.5 原生只读（列表+详情），Web 管理台支持完整 CRUD（创建/编辑/删除用户、重置密码、取消 2FA、SSH Key 管理）。
+2. **存储管理**：v0.5 原生只做查看、启用、禁用、重新加载全部，Web 管理台支持完整创建/编辑/删除存储与动态驱动配置表单。
+3. **设置管理**：v0.5 原生只读（含默认设置对比），Web 管理台支持保存、删除设置项、重置 API Token、各类下载工具账号配置表单。
+4. **任务管理**：v0.5 原生覆盖 7 类任务的常用动作（取消/重试/删除记录），不做批量清理接口（`cancel_some`/`delete_some`/`retry_some`/`clear_done`/`clear_succeeded`/`retry_failed`）、完整日志详情、速度曲线。
+5. **索引管理**：v0.5 原生覆盖构建/更新/停止/清空常用动作，但路径更新细节（如 `maxDepth` 语义、多路径选择器）可能与 Web 端实际行为存在差异，`maxDepth=-1` 默认值为客户端最佳努力推导，非确认契约。
+6. **Web 兜底**：不注入原生 App 的 Token/Cookie（原生会话与 Web 会话完全独立），打开 `/@manage` 后可能需要用户在 Web 端重新登录。
+
+---
+
+## v0.4 待真机核对的后端行为推测（V-401 ~ V-410，历史遗留，v0.5 未重新核实）
 
 以下验证项详见 `v0.4_IMPLEMENTATION_LOG.md` S0 章节，均已尽力对照 `openlist-ref/` 后端参考源码核实到 handler/路由层，但部分内部实现（签名生成/校验、反代 Range 转发细节）不在本地精简 checkout 范围内，标注为 provisional：
 
@@ -45,45 +62,18 @@ v0.3 当时至少还能跑 `compileDebugKotlin`/`assembleDebug`/`testDebugUnitTe
 - **V-06** `expires` 序列化格式：使用 `OffsetDateTime`/UTC 生成 RFC3339 字符串，未核对后端时区处理细节。
 - **V-07** 普通用户 `share/list` 是否只返回自己的分享：已从后端源码确认（`op.GetSharingsByCreatorId`），未做真机复核。
 
-## v0.4 权限门控
-
-- 预览属读操作，游客态**不隐藏**预览/播放/外部打开入口（PRD 明确要求），403 由后端返回时展示"无权限"提示；预览相关 UI 代码已核查，无任何 `canWrite`/`isGuest`/权限位判断分支来隐藏预览入口。
-- 与 v0.2/v0.3 一致：写操作入口仍是"游客隐藏、已登录用户乐观展示，真实权限以后端 403 为准"，v0.4 未改动此策略。
-
-## v0.4 功能范围（刻意裁剪，见 v0.4_PRD.md §5.3 "不做"）
-
-- PDF 内置预览、Office 内置预览（均只做外部打开兜底）。
-- 代码高亮、歌词支持、图片画廊模式、README 自动渲染增强。
-- 归档文件内部浏览、Torrent 预览/种子内容解析。
-- 完整分享态目录浏览、任意分享 URL 入站解析（分享详情仅支持已知路径预览，不支持解析外部分享链接）。
-- 视频转码；字幕在线搜索/下载/时间轴编辑（仅做同目录自动发现+手动选择+开关）。
-- 自研下载器、断点续传、暂停继续下载；管理台；v1.0 原子级对齐完整验收。
-- **Markdown 内嵌图片渲染**：本版本明确裁剪（S3 决策，需要额外的 `markwon-image` 依赖+自研 Coil `AsyncDrawableLoader`，评估后判断超出本版本合理工作量），Markdown 正文本身正常渲染，仅图片不显示，不影响阅读。
-- 图片/文本/Markdown/视频/音频预览失败态的"下载"按钮已接入真实下载（S4 起），但未做"外部打开"以外的自动重试策略。
-
-## v0.4 任务中心/字幕相关限制
-
-- 字幕仅支持 `srt`/`vtt`/`ass`/`ssa` 四种扩展名的自动发现（基于 `fs/get` 的 `related` 字段做客户端扩展名过滤）；手动选择不限制扩展名（用户可选任意文件尝试）。
-- `ass`/`ssa` 字幕在 Media3 上的实际渲染效果依赖 ExoPlayer 自身对 SSA/ASS 格式的支持程度，未真机验证。
-- 任务中心完成任务点击时新增一次 `fs/get` 判断文件/目录（此前一律当目录处理），带来了额外一次网络请求延迟，未做加载态提示（走查代码确认无阻断性问题，但用户点击到实际跳转之间会有短暂网络等待，无真机验证实际耗时体感）。
-
-## 任务中心（v0.3 遗留，v0.4 未处理）
-
-- 本地下载任务的取消操作仍不支持（`TaskAggregationRepository.cancelTask` 对 `LOCAL_DOWNLOAD` 直接返回失败提示）。
-- 任务中心"有运行中任务"徽标仍只反映本地上传任务状态，未聚合下载/远程任务。
-
-## 测试覆盖（v0.4）
-
-- v0.4 新增的 4 个 Repository（`PreviewRepository`/`MediaRepository`/`SubtitleRepository`/`ExternalOpenRepository`）、`PreviewKindResolver`、流式读取/截断/BOM 解析、缓存失效、Header 限域、错误重试上限均已补充单元测试（详见各 Sprint 的 `v0.4_IMPLEMENTATION_LOG.md` 记录），但**全部只写未运行**（本轮环境禁止执行任何测试命令），下次进入可构建环境时需要先跑一遍 `testDebugUnitTest` 确认全部通过。
-- Media3/Compose UI 集成层面（ExoPlayer/PlayerView/字幕渲染/横竖屏切换）未做也无法做 instrumented test。
-- Room Migration 7→8 未做 `MigrationTestHelper` 插桩测试，且这次连 KSP schema 导出本身都未运行过（`8.json` 手工推导，见上文）。
-
-## 工程/发布（v0.4）
-
-- `Parity_Matrix.md` 仍未创建；v0.4 PRD §19.2 要求的 8 项 Web 端行为差异记录见本文件与 `v0.4_ACCEPTANCE_REPORT.md`。
-- 深色模式色板复用既有 token，v0.4 新组件（`PreviewScaffold`/`ExternalOpenSheet`/`SubtitleSelector`/播放器控制条等）未做系统性人工暗色走查。
-
 ---
+
+## v0.4.0（历史）
+
+- 本轮（v0.4）开发环境曾禁止运行任何构建/测试命令，是历史上唯一一次连编译都没跑过的版本；v0.5 已重新执行完整构建并确认通过，此项 caveat 到 v0.5 为止解除。
+- V-401~V-410（`raw_url` 签名有效期、`/d/`/`/p/` 优先级、Range 支持、鉴权失败响应形态、分享路径预览、字幕候选可靠性、路径编码一致性、Media3 容器支持面、Markdown 内嵌图片不适用、签名/Token 失效表现）均已对照后端源码核实到 handler/路由层，部分内部实现细节标记 provisional，v0.5 未重新核实（与预览/播放器功能无关联）。
+- Media3/ExoPlayer 实际播放效果、Markdown 渲染排版、图片预览/Coil 缓存、v0.4 全部新页面的暗色模式——均未真机验证，v0.5 未新增相关验证（预览模块本身在 v0.5 未改动）。
+- Room 7→8 真实升级路径与 `8.json` 手工 `identityHash` 占位值——v0.5 引入 Room 8→9 后，此 caveat 与新的 9.json 占位值一并延续，见本文件顶部"未在真机上验证的项目"。
+- 预览相关权限门控（游客不隐藏预览入口，403 由后端裁决）与 v0.5 管理台门控策略（游客/非管理员在管理台内容层面直接拦截而非仅提示）不同——两者是不同层级的功能，不构成矛盾。
+- Markdown 内嵌图片渲染明确裁剪，仍未实现；字幕仅支持 `srt`/`vtt`/`ass`/`ssa` 四种扩展名自动发现。
+- `Parity_Matrix.md` 当时仍未创建，v0.4 PRD §19.2 的 8 项差异记录见 `v0.4_ACCEPTANCE_REPORT.md`；v0.5 PRD §18.1 的 6 项差异记录见本文件顶部"v1.0 Parity Matrix 预留材料"。
+- v0.4 新增 4 个 Repository 的单元测试当时只写未运行，v0.5 起点（S0）首次实际跑通并确认全部通过。
 
 ## v0.3.0（历史）
 

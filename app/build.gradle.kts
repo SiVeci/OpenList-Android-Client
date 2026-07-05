@@ -32,7 +32,7 @@ android {
         applicationId = "io.openlist.client"
         minSdk = 29
         targetSdk = 35
-        versionCode = 4
+        versionCode = 5
         versionName = libs.versions.appVersionName.get()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

@@ -1,8 +1,8 @@
 # OpenList Android Client
 
-原生 Android 客户端，用于连接自建的 [OpenList](https://github.com/OpenListTeam/OpenList) 实例：多实例管理、登录/游客/管理员 Token 三种鉴权方式、目录浏览、文件详情、下载、文件写操作（新建/重命名/删除/移动/复制）、批量选择、上传、分享、搜索、统一任务中心、基础离线下载、统一文件预览分发（图片/文本/Markdown/视频/音频 App 内预览，PDF/Office/未知格式外部打开兜底）、基础字幕支持。
+原生 Android 客户端，用于连接自建的 [OpenList](https://github.com/OpenListTeam/OpenList) 实例：多实例管理、登录/游客/管理员 Token 三种鉴权方式、目录浏览、文件详情、下载、文件写操作（新建/重命名/删除/移动/复制）、批量选择、上传、分享、搜索、统一任务中心、基础离线下载、统一文件预览分发（图片/文本/Markdown/视频/音频 App 内预览，PDF/Office/未知格式外部打开兜底）、基础字幕支持、轻量管理台（管理员门控、用户/存储查看、存储启停、7 类任务管理、索引管理、设置查看、Web 管理台兜底）。
 
-当前版本：**v0.4（预览与播放器版）**。范围与后续规划见 [v0.4_PRD.md](v0.4_PRD.md)、[v0.4_EXECUTION_PLAN.md](v0.4_EXECUTION_PLAN.md)、[Full_PRD.md](Full_PRD.md)。v0.1/v0.2/v0.3 范围见 [v0.1_PRD.md](v0.1_PRD.md)、[v0.2_PRD.md](v0.2_PRD.md)、[v0.3_PRD.md](v0.3_PRD.md)。
+当前版本：**v0.5（轻量管理台版）**。范围与后续规划见 [v0.5_PRD.md](v0.5_PRD.md)、[v0.5_EXECUTION_PLAN.md](v0.5_EXECUTION_PLAN.md)、[Full_PRD.md](Full_PRD.md)。v0.1~v0.4 范围见 [v0.1_PRD.md](v0.1_PRD.md)、[v0.2_PRD.md](v0.2_PRD.md)、[v0.3_PRD.md](v0.3_PRD.md)、[v0.4_PRD.md](v0.4_PRD.md)。
 
 ## 技术栈
 
@@ -14,9 +14,9 @@ Kotlin · Jetpack Compose (Material 3) · Hilt · Retrofit + OkHttp + kotlinx.se
 
 ```
 core/common          ApiResult / DomainError / SafeLogger / DispatcherProvider
-core/model           领域模型（Instance / FileNode / FileDetail / PreviewTarget / MediaSource / SubtitleCandidate 等）
-core/designsystem    主题 + 交互组件（Dialog/Sheet/BatchSelectionTopBar/ExternalOpenSheet 等）
-core/database        Room（Instance/Session/FileCache/.../PreviewCache）+ DataStore + Migrations
+core/model           领域模型（Instance / FileNode / FileDetail / PreviewTarget / MediaSource / AdminModels 等）
+core/designsystem    主题 + 交互组件（Dialog/Sheet/BatchSelectionTopBar/ExternalOpenSheet/AdminComponents 等）
+core/database        Room（Instance/Session/FileCache/.../PreviewCache/AdminCache）+ DataStore + Migrations
 core/auth            CryptoManager（Keystore AES-GCM）/ SessionManager / TokenProvider
 core/network         OpenListApi / OpenListClientFactory / 拦截器 / 路径与 URL 规范化 / 上传与预览专用 OkHttpClient
 core/domain          Repository 接口
@@ -24,21 +24,22 @@ data/repository      Repository 实现 + UploadWorker（WorkManager CoroutineWor
 feature/instance     实例管理
 feature/auth         登录
 feature/files        文件浏览 / 详情 / 写操作 / 批量选择 / 上传入口与进度面板 / 分享创建入口
-feature/settings     设置
+feature/settings     设置（含管理台入口行）
 feature/upload       预留（上传 UI 内嵌在 feature/files）
 feature/share        分享列表 / 详情 / 创建 / 编辑 / 启停 / 删除 / 分享文件预览接线
 feature/search       当前目录 / 全局搜索 + 搜索历史
 feature/task         统一任务中心（上传/下载/远程）+ 离线下载提交
 feature/preview      统一文件打开分发 / 图片/文本/Markdown 预览 / 视频音频播放器 / 字幕
+feature/admin        轻量管理台：门控 / 概览 / 用户查看 / 存储查看+启停 / 驱动信息 / 7 类任务管理 / 索引管理 / 设置查看 / Web 兜底
 ```
 
-reserved 特性（admin/webfallback）仍以 `:app` 内占位包形式保留，留待 v0.5（预览已在 v0.4 graduate 为真实模块）。
+reserved 特性（webfallback）仍以 `:app` 内占位包形式保留，供未来 SSO/WebAuthn 使用（预览已在 v0.4、管理台已在 v0.5 graduate 为真实模块）。
 
 ## 构建
 
 ```bash
 ./gradlew assembleDebug          # 全部模块 Debug 构建
-./gradlew testDebugUnitTest      # 本地单元测试（路径编解码 / Base URL 规范化 / 批量操作聚合 / 预览分发 / 缓存失效 / 播放重试上限 等）
+./gradlew testDebugUnitTest      # 本地单元测试（路径编解码 / Base URL 规范化 / 批量操作聚合 / 预览分发 / 缓存失效 / 播放重试上限 / 管理台门控与各 Repository 等）
 ./gradlew assembleRelease        # Release APK（见下方签名配置）
 ```
 
@@ -65,7 +66,7 @@ RELEASE_KEY_ALIAS=openlist
 RELEASE_KEY_PASSWORD=你的key密码
 ```
 
-## 快速上手（v0.4 功能范围）
+## 快速上手（v0.5 功能范围）
 
 1. 打开 App，点击「添加实例」，输入 OpenList 实例地址（`http(s)://` 开头，支持部署在子路径）。
 2. 「测试连接」确认可达（依次尝试 `/ping`、`/api/public/settings`）。
@@ -81,13 +82,15 @@ RELEASE_KEY_PASSWORD=你的key密码
 9. 文件菜单/详情页「分享」：路径只读 + 名称 + 密码（可空）+ 过期时间快捷项 + 启用开关，创建成功后可复制链接/密码/完整文案或调用系统分享面板。顶部「我的分享」查看/修改/启停/删除已创建的分享；分享详情页新增「分享文件」列表，可直接预览已分享的文件。
 10. 文件列表顶部「搜索」：当前目录/全局二选一，支持历史记录，可预览的搜索结果直接进入统一预览。
 11. 顶部「任务中心」：统一查看上传/下载/远程任务（离线下载/转存/复制/移动），可取消远程任务；已完成任务点击后自动判断目标是文件还是目录，文件直接进入预览、目录跳转浏览；右上角「+」提交新的离线下载任务。
-12. 「设置」页可清理本地缓存、开关调试日志、快速进入当前实例的任务中心。
+12. 「设置」页可清理本地缓存、开关调试日志、快速进入当前实例的任务中心；管理员账号额外可见「管理台」入口（非管理员显示为不可用说明，游客不显示）。
+13. 管理台（仅管理员可进入）：概览（实例信息+存储/任务/索引摘要卡+Web 兜底入口）、用户查看（列表+只读详情）、存储查看（列表+详情+驱动信息，可启用/禁用/重新加载全部）、任务管理（覆盖 7 类后端任务，可取消/重试/删除记录）、索引管理（进度查看+构建/更新/停止/清空）、设置查看（分组只读+默认设置对比，私密值掩码）、高级页（Web 管理台外部打开兜底 + 原生不覆盖能力清单）。
 
-v0.4 **不包含**：PDF/Office 内置预览、代码高亮、歌词、图片画廊、归档文件浏览、Torrent 预览、完整分享态目录浏览、字幕在线搜索/下载、管理台、断点续传/分片上传。这些均已在架构层面预留或明确排除，具体范围见 [v0.4_PRD.md](v0.4_PRD.md) §5.3，已知限制见 [KNOWN_ISSUES.md](KNOWN_ISSUES.md)。
+v0.5 **不包含**：用户/存储的创建编辑删除、动态驱动配置表单、设置保存/删除/重置 Token、Meta/消息/扫描管理、批量任务清理接口、完整 Web 管理台像素级复刻。这些均已在架构层面预留或明确排除，具体范围见 [v0.5_PRD.md](v0.5_PRD.md) §5.3，已知限制见 [KNOWN_ISSUES.md](KNOWN_ISSUES.md)。
 
 ## 其他文档
 
 - [KNOWN_ISSUES.md](KNOWN_ISSUES.md) — 已知问题与限制
 - [RELEASE_NOTES.md](RELEASE_NOTES.md) — 版本发布说明
+- [v0.5_ACCEPTANCE_REPORT.md](v0.5_ACCEPTANCE_REPORT.md) — v0.5 验收报告
 - [v0.4_ACCEPTANCE_REPORT.md](v0.4_ACCEPTANCE_REPORT.md) — v0.4 验收报告
 - [v0.2_BACKLOG.md](v0.2_BACKLOG.md) — 历史版本待办
