@@ -14,9 +14,11 @@ import io.openlist.client.core.domain.AdminWebFallbackRepository
 import io.openlist.client.core.domain.AuthRepository
 import io.openlist.client.core.domain.InstanceRepository
 import io.openlist.client.core.model.AdminAccessState
+import io.openlist.client.core.model.UnifiedTaskStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
@@ -196,10 +198,17 @@ class AdminViewModel @Inject constructor(
         viewModelScope.launch {
             when (val result = adminTaskRepository.refreshUndone(instanceId)) {
                 is ApiResult.Success -> {
-                    // refreshUndone populates observeAdminTasks; a single
-                    // synchronous read is enough for a summary count (no need
-                    // to keep collecting the Flow for this Sprint's skeleton).
-                    val runningCount = 0
+                    // A single synchronous read of the just-refreshed in-memory
+                    // flow is enough for a summary count -- observeAdminTasks
+                    // only just finished being populated by the refreshUndone
+                    // call above, so `.first()` reflects its result without
+                    // needing to keep collecting for the rest of this
+                    // ViewModel's lifetime (unlike the Tasks Tab itself, which
+                    // does stay subscribed for live updates/polling).
+                    val tasks = adminTaskRepository.observeAdminTasks(instanceId).first()
+                    val runningCount = tasks.count {
+                        !it.isDone && (it.state == UnifiedTaskStatus.RUNNING || it.state == UnifiedTaskStatus.PENDING)
+                    }
                     _uiState.update { it.copy(taskSummary = AdminCardState.Loaded(AdminTaskSummaryCard(runningCount))) }
                 }
                 is ApiResult.Failure -> _uiState.update {

@@ -142,6 +142,7 @@ private fun AdminScaffold(
                 )
                 AdminTab.USERS -> AdminUserTab(instanceId = instanceId)
                 AdminTab.STORAGES -> AdminStorageTab(instanceId = instanceId)
+                AdminTab.TASKS -> AdminTaskTab(instanceId = instanceId)
                 else -> AdminComingSoon(tab = uiState.selectedTab)
             }
         }

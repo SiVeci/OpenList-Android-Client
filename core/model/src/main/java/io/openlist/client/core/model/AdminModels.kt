@@ -101,6 +101,17 @@ data class AdminStoragePage(
  * [AdminTask] covers 7 task types, is admin-scoped (every user's tasks, not
  * just the caller's), and per v0.5_EXECUTION_PLAN.md §7.1/B-503 is never
  * persisted to Room (in-memory `StateFlow` only in `AdminTaskRepositoryImpl`).
+ *
+ * [isDone] (added S5) records **which endpoint fetched this row**
+ * (`admin/task/{type}/undone` vs `.../done`), not a guess derived from
+ * [state]: the backend's own undone/done split doesn't line up 1:1 with
+ * [UnifiedTaskStatus] (`TaskStateMapper` collapses both the transient
+ * "Errored" state -- still `undone` server-side, awaiting retry -- and the
+ * terminal "Failed" state -- `done` -- into the same [UnifiedTaskStatus
+ * .FAILED] value), so [state] alone cannot reliably tell a UI which list a
+ * row belongs to. `AdminTaskRepositoryImpl.observeAdminTasks` flattens both
+ * buckets into one list per PRD §12.5's undone/done toggle, and [isDone] is
+ * what lets the Tasks Tab filter that flattened list correctly.
  */
 data class AdminTask(
     val id: String,
@@ -116,6 +127,7 @@ data class AdminTask(
     val error: String?,
     val startTime: Long?,
     val endTime: Long?,
+    val isDone: Boolean,
 )
 
 /**
