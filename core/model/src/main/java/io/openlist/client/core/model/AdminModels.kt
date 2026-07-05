@@ -1,11 +1,20 @@
 package io.openlist.client.core.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * Domain models for the v0.5 lightweight admin console
  * (v0.5_EXECUTION_PLAN.md §8.1, PRD §11). None of these are Room entities —
  * the only Room-backed piece is `AdminCacheEntity` (`core:database`), which
  * stores a serialized form of a subset of these models, never a raw backend
  * response (§8.3/P-507).
+ *
+ * [AdminUserSummary]/[AdminUserPage]/[AdminStorageSummary]/[AdminStorageDetails]/
+ * [AdminStoragePage] are `@Serializable` (S3-T1/T3) so `admin_cache.rawJson` can
+ * hold their `Json.encodeToString` output directly — this is the *only* reason
+ * `core:model` depends on kotlinx.serialization at all; nothing here is ever
+ * decoded from a raw backend response (that happens one layer down, at the DTO
+ * boundary in `core:network`/`data:repository`).
  */
 
 /**
@@ -26,6 +35,7 @@ enum class AdminAccessState { CHECKING, ALLOWED, DENIED_NOT_ADMIN, DENIED_GUEST,
  * carried into this model, so nothing downstream (cache/UI/logs) can
  * accidentally leak it even by a future careless `copy()`.
  */
+@Serializable
 data class AdminUserSummary(
     val id: Int,
     val username: String,
@@ -40,6 +50,7 @@ data class AdminUserSummary(
     val otpEnabled: Boolean?,
 )
 
+@Serializable
 data class AdminUserPage(
     val users: List<AdminUserSummary>,
     val total: Long,
@@ -50,16 +61,19 @@ data class AdminUserPage(
  * exact string values are backend/driver-dependent (often "work" when
  * healthy, or a driver error message), so this enum only distinguishes the
  * client-actionable buckets rather than mirroring the raw string 1:1. */
+@Serializable
 enum class AdminStorageStatus { ENABLED, DISABLED, ERROR, UNKNOWN }
 
 /** `model.StorageDetails` (embeds `DiskUsage`) — only present when the
  * backend's driver implements `driver.WithDetails` and responds within its
  * 3s collection window; absent otherwise (PRD §9.3.3). */
+@Serializable
 data class AdminStorageDetails(
     val totalSpace: Long,
     val usedSpace: Long,
 )
 
+@Serializable
 data class AdminStorageSummary(
     val id: Int,
     val mountPath: String,
@@ -71,6 +85,7 @@ data class AdminStorageSummary(
     val mountDetails: AdminStorageDetails?,
 )
 
+@Serializable
 data class AdminStoragePage(
     val storages: List<AdminStorageSummary>,
     val total: Long,

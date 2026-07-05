@@ -67,6 +67,7 @@ fun AdminHostScreen(
         }
         AdminAccessState.ALLOWED -> {
             AdminScaffold(
+                instanceId = instanceId,
                 uiState = uiState,
                 onBack = onBack,
                 onSelectTab = viewModel::selectTab,
@@ -106,6 +107,7 @@ private fun AdminAccessDeniedScreen(
  */
 @Composable
 private fun AdminScaffold(
+    instanceId: String,
     uiState: AdminUiState,
     onBack: () -> Unit,
     onSelectTab: (AdminTab) -> Unit,
@@ -138,6 +140,8 @@ private fun AdminScaffold(
                     onRetryTask = onRetryTask,
                     onRetryIndex = onRetryIndex,
                 )
+                AdminTab.USERS -> AdminUserTab(instanceId = instanceId)
+                AdminTab.STORAGES -> AdminStorageTab(instanceId = instanceId)
                 else -> AdminComingSoon(tab = uiState.selectedTab)
             }
         }
