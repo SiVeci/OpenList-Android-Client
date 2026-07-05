@@ -13,21 +13,26 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import io.openlist.client.core.designsystem.Spacing
+import io.openlist.client.core.designsystem.components.ConfirmDialog
 import io.openlist.client.core.designsystem.components.EmptyState
 import io.openlist.client.core.designsystem.components.ErrorBar
 import io.openlist.client.core.designsystem.components.LoadingState
@@ -37,16 +42,14 @@ import io.openlist.client.core.model.AdminStorageStatus
 import io.openlist.client.core.model.AdminStorageSummary
 
 /**
- * Storage Tab content, read-only part only (v0.5_EXECUTION_PLAN.md §11 S3-T4)
- * -- enable/disable/reload-all are S4 scope, and are rendered here as
- * visually-disabled placeholder buttons only (per the S3 brief: "render
- * disabled/greyed-out buttons as a visual preview if trivial ... just don't
- * wire them to anything real yet"). List: mount path/driver/status badge/
- * remark. Detail sheet: full fields + mountDetails in its own sub-section
- * with an independent "unavailable" state (PRD §9.3.3) -- since [getStorage]
- * (interface) already returns the whole [AdminStorageSummary] in one call,
- * "independent loading" here just means the mountDetails sub-section shows
- * "详情不可用" gracefully when null, not a second network round-trip/spinner.
+ * Storage Tab content (v0.5_EXECUTION_PLAN.md §11 S3-T4/S4-T3/S4-T4).
+ * List: mount path/driver/status badge/remark, plus a "重新加载全部存储" entry
+ * at the top (PRD §12.4.7). Detail sheet: full fields + mountDetails
+ * sub-section + real enable/disable actions (S4, replacing S3's disabled
+ * visual placeholders) + a "查看驱动信息" row (PRD §12.4.8) opening a second,
+ * independent bottom sheet with the dynamic driver config rendered as plain
+ * key/value text rows (no rich renderer, per PRD's "结构复杂时只展示驱动名+关键摘要"
+ * fallback).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,34 +59,50 @@ fun AdminStorageTab(
 ) {
     LaunchedEffect(instanceId) { viewModel.bind(instanceId) }
     val uiState by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    PullToRefreshBox(
-        isRefreshing = uiState.isRefreshing,
-        onRefresh = { viewModel.refresh() },
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        when {
-            uiState.isLoading -> LoadingState(modifier = Modifier.fillMaxSize())
-            uiState.errorMessage != null && uiState.storages.isEmpty() -> EmptyState(
-                title = "加载失败",
-                description = uiState.errorMessage,
-                modifier = Modifier.fillMaxSize(),
-            )
-            uiState.storages.isEmpty() -> EmptyState(
-                title = "暂无存储",
-                modifier = Modifier.fillMaxSize(),
-            )
-            else -> Column(modifier = Modifier.fillMaxSize()) {
-                uiState.errorMessage?.let { message ->
-                    ErrorBar(message = message, onRetry = { viewModel.refresh() })
-                }
-                LazyColumn(
+    LaunchedEffect(uiState.snackbarMessage) {
+        uiState.snackbarMessage?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            viewModel.dismissSnackbar()
+        }
+    }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+    ) { padding ->
+        PullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = { viewModel.refresh() },
+            modifier = Modifier.fillMaxSize().padding(padding),
+        ) {
+            when {
+                uiState.isLoading -> LoadingState(modifier = Modifier.fillMaxSize())
+                uiState.errorMessage != null && uiState.storages.isEmpty() -> EmptyState(
+                    title = "加载失败",
+                    description = uiState.errorMessage,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(vertical = Spacing.xs),
-                ) {
-                    items(uiState.storages, key = { it.id }) { storage ->
-                        AdminStorageRow(storage = storage, onClick = { viewModel.selectStorage(storage) })
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                )
+                uiState.storages.isEmpty() -> EmptyState(
+                    title = "暂无存储",
+                    modifier = Modifier.fillMaxSize(),
+                )
+                else -> Column(modifier = Modifier.fillMaxSize()) {
+                    uiState.errorMessage?.let { message ->
+                        ErrorBar(message = message, onRetry = { viewModel.refresh() })
+                    }
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(vertical = Spacing.xs),
+                    ) {
+                        item {
+                            ReloadAllRow(onClick = viewModel::requestReloadAll)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        }
+                        items(uiState.storages, key = { it.id }) { storage ->
+                            AdminStorageRow(storage = storage, onClick = { viewModel.selectStorage(storage) })
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        }
                     }
                 }
             }
@@ -91,7 +110,66 @@ fun AdminStorageTab(
     }
 
     uiState.selectedStorage?.let { storage ->
-        AdminStorageDetailSheet(storage = storage, onDismiss = { viewModel.dismissStorageDetail() })
+        AdminStorageDetailSheet(
+            storage = storage,
+            onDismiss = { viewModel.dismissStorageDetail() },
+            onEnable = { viewModel.requestEnable(storage) },
+            onDisable = { viewModel.requestDisable(storage) },
+            onViewDriverInfo = { viewModel.viewDriverInfo(storage.driver) },
+        )
+    }
+
+    uiState.driverInfo?.let { driverInfo ->
+        AdminDriverInfoSheet(driverInfo = driverInfo, onDismiss = { viewModel.dismissDriverInfo() })
+    }
+
+    AdminStorageConfirmDialog(uiState = uiState, viewModel = viewModel)
+}
+
+@Composable
+private fun ReloadAllRow(onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+    ) {
+        Text("重新加载全部存储", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
+    }
+}
+
+@Composable
+private fun AdminStorageConfirmDialog(uiState: AdminStorageListUiState, viewModel: AdminStorageListViewModel) {
+    when (val dialog = uiState.dialog) {
+        is AdminStorageDialog.EnableConfirm -> ConfirmDialog(
+            title = "启用存储",
+            message = "确定启用「${dialog.storage.mountPath}」吗？",
+            onConfirm = viewModel::confirmDialog,
+            onDismiss = viewModel::dismissDialog,
+            confirmText = "启用",
+            loading = uiState.dialogLoading,
+            errorMessage = uiState.dialogError,
+        )
+        is AdminStorageDialog.DisableConfirm -> ConfirmDialog(
+            title = "禁用存储",
+            message = "确定禁用「${dialog.storage.mountPath}」吗？禁用后该挂载路径下的文件将暂时不可访问。",
+            onConfirm = viewModel::confirmDialog,
+            onDismiss = viewModel::dismissDialog,
+            confirmText = "禁用",
+            danger = true,
+            loading = uiState.dialogLoading,
+            errorMessage = uiState.dialogError,
+        )
+        AdminStorageDialog.ReloadAllConfirm -> ConfirmDialog(
+            title = "重新加载全部存储",
+            message = "确定重新加载全部存储吗？该操作将在后台进行，可能需要一些时间。",
+            onConfirm = viewModel::confirmDialog,
+            onDismiss = viewModel::dismissDialog,
+            confirmText = "重新加载",
+            loading = uiState.dialogLoading,
+            errorMessage = uiState.dialogError,
+        )
+        null -> Unit
     }
 }
 
@@ -116,15 +194,20 @@ private fun AdminStorageRow(storage: AdminStorageSummary, onClick: () -> Unit) {
 }
 
 /**
- * Read-only storage detail bottom sheet (PRD §12.3/§9.3.3, P-502). The
- * enable/disable/"reload all" buttons here are intentionally disabled visual
- * previews only (S4 wires the real Repository calls) -- clicking them does
- * nothing this Sprint, and they carry no `onClick` side effect at all so
- * there's no risk of silently no-op'ing a user's real intent.
+ * Storage detail bottom sheet (PRD §12.3/§9.3.3, P-502). Enable/disable now
+ * call real [onEnable]/[onDisable] callbacks (S4, replacing S3's disabled
+ * visual placeholders) -- the actual confirm dialog/network call lives in
+ * [AdminStorageListViewModel], this composable only opens the request.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AdminStorageDetailSheet(storage: AdminStorageSummary, onDismiss: () -> Unit) {
+private fun AdminStorageDetailSheet(
+    storage: AdminStorageSummary,
+    onDismiss: () -> Unit,
+    onEnable: () -> Unit,
+    onDisable: () -> Unit,
+    onViewDriverInfo: () -> Unit,
+) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
@@ -156,17 +239,65 @@ private fun AdminStorageDetailSheet(storage: AdminStorageSummary, onDismiss: () 
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Text(
-                text = "启用/禁用/重新加载将在后续版本提供",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable(onClick = onViewDriverInfo),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("查看驱动信息", style = MaterialTheme.typography.bodyLarge)
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth().weight(1f)) {
-                    Text(if (storage.disabled) "启用" else "禁用")
+                if (storage.disabled) {
+                    Button(onClick = onEnable, modifier = Modifier.fillMaxWidth().weight(1f)) {
+                        Text("启用")
+                    }
+                } else {
+                    OutlinedButton(onClick = onDisable, modifier = Modifier.fillMaxWidth().weight(1f)) {
+                        Text("禁用")
+                    }
                 }
             }
             Spacer(Modifier.size(Spacing.xs))
+            Spacer(Modifier.navigationBarsPadding())
+        }
+    }
+}
+
+/** Read-only driver-info sheet (PRD §12.4.8, S4-T4) -- dynamic key/value map
+ * rendered as plain text rows, no structured parsing (PRD "结构复杂时只展示驱动名+
+ * 关键摘要"). Loading/failed states mirror [AdminCardState] the same way the
+ * Overview Tab's summary cards do. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AdminDriverInfoSheet(driverInfo: AdminDriverInfoUiState, onDismiss: () -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Text(driverInfo.driverName, style = MaterialTheme.typography.titleLarge)
+            when (val state = driverInfo.state) {
+                is AdminCardState.Loading -> LoadingState(modifier = Modifier.fillMaxWidth())
+                is AdminCardState.Failed -> Text(
+                    text = state.message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                is AdminCardState.Loaded -> if (state.data.isEmpty()) {
+                    Text(
+                        text = "无附加信息",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    state.data.forEach { (key, value) ->
+                        DetailRow(label = key, value = value?.toString() ?: "-")
+                    }
+                }
+            }
             Spacer(Modifier.navigationBarsPadding())
         }
     }

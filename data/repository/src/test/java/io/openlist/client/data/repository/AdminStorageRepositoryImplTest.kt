@@ -8,8 +8,10 @@ import io.openlist.client.core.auth.SessionManager
 import io.openlist.client.core.common.ApiResult
 import io.openlist.client.core.common.DomainError
 import io.openlist.client.core.database.dao.AdminCacheDao
+import io.openlist.client.core.database.dao.FileCacheDao
 import io.openlist.client.core.database.entity.AdminCacheEntity
 import io.openlist.client.core.domain.InstanceRepository
+import io.openlist.client.core.domain.PreviewRepository
 import io.openlist.client.core.model.AdminStoragePage
 import io.openlist.client.core.model.AdminStorageStatus
 import io.openlist.client.core.model.Instance
@@ -41,6 +43,8 @@ class AdminStorageRepositoryImplTest {
     private val clientFactory = mockk<OpenListClientFactory>()
     private val sessionManager = mockk<SessionManager>(relaxed = true)
     private val adminCacheDao = mockk<AdminCacheDao>(relaxed = true)
+    private val fileCacheDao = mockk<FileCacheDao>(relaxed = true)
+    private val previewRepository = mockk<PreviewRepository>(relaxed = true)
     private val json = Json { ignoreUnknownKeys = true }
 
     private lateinit var repository: AdminStorageRepositoryImpl
@@ -65,6 +69,8 @@ class AdminStorageRepositoryImplTest {
             instanceContext = InstanceContext(),
             sessionManager = sessionManager,
             adminCacheDao = adminCacheDao,
+            fileCacheDao = fileCacheDao,
+            previewRepository = previewRepository,
             json = json,
         )
     }
@@ -205,6 +211,130 @@ class AdminStorageRepositoryImplTest {
 
         assertEquals("/one", result.data.mountPath)
         assertNull(result.data.mountDetails)
+    }
+
+    // ---- S4-T1/T2: enable/disable ----
+
+    @Test
+    fun `enableStorage success invalidates storages cache scope and precisely invalidates the mount path`() = runTest {
+        coEvery { api.adminStorageEnable(5) } returns ApiResponse(code = 200, data = null)
+        coEvery { api.adminStorageGet(5) } returns ApiResponse(
+            code = 200,
+            data = AdminStorageDto(id = 5, mountPath = "/nas/", driver = "Local", status = "work", disabled = false),
+        )
+
+        val result = repository.enableStorage(INSTANCE_ID, 5)
+
+        assertTrue(result is ApiResult.Success)
+        coVerify(exactly = 1) { adminCacheDao.deleteByScope(INSTANCE_ID, "storages") }
+        // mountPath is normalized (trailing slash stripped) before being used as a prefix.
+        coVerify(exactly = 1) { fileCacheDao.deleteByPathPrefix(INSTANCE_ID, "/nas") }
+        coVerify(exactly = 1) { previewRepository.invalidateByPrefix(INSTANCE_ID, "/nas") }
+    }
+
+    @Test
+    fun `disableStorage success invalidates storages cache scope and precisely invalidates the mount path`() = runTest {
+        coEvery { api.adminStorageDisable(6) } returns ApiResponse(code = 200, data = null)
+        coEvery { api.adminStorageGet(6) } returns ApiResponse(
+            code = 200,
+            data = AdminStorageDto(id = 6, mountPath = "/webdav", driver = "WebDav", status = "work", disabled = true),
+        )
+
+        val result = repository.disableStorage(INSTANCE_ID, 6)
+
+        assertTrue(result is ApiResult.Success)
+        coVerify(exactly = 1) { adminCacheDao.deleteByScope(INSTANCE_ID, "storages") }
+        coVerify(exactly = 1) { fileCacheDao.deleteByPathPrefix(INSTANCE_ID, "/webdav") }
+        coVerify(exactly = 1) { previewRepository.invalidateByPrefix(INSTANCE_ID, "/webdav") }
+    }
+
+    @Test
+    fun `enableStorage failure leaves cache untouched and surfaces the backend message`() = runTest {
+        coEvery { api.adminStorageEnable(7) } returns ApiResponse(code = 500, message = "this storage have enabled", data = null)
+
+        val result = repository.enableStorage(INSTANCE_ID, 7)
+
+        assertTrue(result is ApiResult.Failure)
+        assertEquals("this storage have enabled", ((result as ApiResult.Failure).error as DomainError.OpenListError).message)
+        coVerify(exactly = 0) { adminCacheDao.deleteByScope(any(), any()) }
+        coVerify(exactly = 0) { fileCacheDao.deleteByPathPrefix(any(), any()) }
+        coVerify(exactly = 0) { previewRepository.invalidateByPrefix(any(), any()) }
+        coVerify(exactly = 0) { api.adminStorageGet(any()) }
+    }
+
+    @Test
+    fun `disableStorage failure leaves cache untouched and surfaces the backend message`() = runTest {
+        coEvery { api.adminStorageDisable(8) } returns ApiResponse(code = 500, message = "failed get storage driver", data = null)
+
+        val result = repository.disableStorage(INSTANCE_ID, 8)
+
+        assertTrue(result is ApiResult.Failure)
+        assertEquals("failed get storage driver", ((result as ApiResult.Failure).error as DomainError.OpenListError).message)
+        coVerify(exactly = 0) { adminCacheDao.deleteByScope(any(), any()) }
+        coVerify(exactly = 0) { fileCacheDao.deleteByPathPrefix(any(), any()) }
+        coVerify(exactly = 0) { previewRepository.invalidateByPrefix(any(), any()) }
+    }
+
+    @Test
+    fun `enableStorage 401 invalidates the session and does not touch caches`() = runTest {
+        coEvery { api.adminStorageEnable(any()) } returns ApiResponse(code = 401, message = "unauthorized", data = null)
+
+        val result = repository.enableStorage(INSTANCE_ID, 1)
+
+        assertTrue(result is ApiResult.Failure)
+        assertEquals(DomainError.Unauthorized, (result as ApiResult.Failure).error)
+        coVerify(exactly = 1) { sessionManager.invalidate(INSTANCE_ID) }
+        coVerify(exactly = 0) { adminCacheDao.deleteByScope(any(), any()) }
+    }
+
+    // ---- S4-T1/T2: reload-all (broad invalidation) ----
+
+    @Test
+    fun `reloadAllStorages success invalidates storages cache scope and broadly invalidates the whole instance`() = runTest {
+        coEvery { api.adminStorageLoadAll() } returns ApiResponse(code = 200, data = null)
+
+        val result = repository.reloadAllStorages(INSTANCE_ID)
+
+        assertTrue(result is ApiResult.Success)
+        coVerify(exactly = 1) { adminCacheDao.deleteByScope(INSTANCE_ID, "storages") }
+        coVerify(exactly = 1) { fileCacheDao.deleteByInstanceId(INSTANCE_ID) }
+        coVerify(exactly = 1) { previewRepository.invalidateByPrefix(INSTANCE_ID, "/") }
+        // Broad invalidation never touches the precise per-storage path helper.
+        coVerify(exactly = 0) { fileCacheDao.deleteByPathPrefix(any(), any()) }
+    }
+
+    @Test
+    fun `reloadAllStorages failure leaves cache untouched and surfaces the backend message`() = runTest {
+        coEvery { api.adminStorageLoadAll() } returns ApiResponse(code = 500, message = "failed get enabled storages", data = null)
+
+        val result = repository.reloadAllStorages(INSTANCE_ID)
+
+        assertTrue(result is ApiResult.Failure)
+        assertEquals("failed get enabled storages", ((result as ApiResult.Failure).error as DomainError.OpenListError).message)
+        coVerify(exactly = 0) { adminCacheDao.deleteByScope(any(), any()) }
+        coVerify(exactly = 0) { fileCacheDao.deleteByInstanceId(any()) }
+        coVerify(exactly = 0) { previewRepository.invalidateByPrefix(any(), any()) }
+    }
+
+    // ---- S4-T4: driver read-only endpoints ----
+
+    @Test
+    fun `getDriverNames returns the plain string list on success`() = runTest {
+        coEvery { api.adminDriverNames() } returns ApiResponse(code = 200, data = listOf("Local", "WebDav"))
+
+        val result = repository.getDriverNames(INSTANCE_ID) as ApiResult.Success
+
+        assertEquals(listOf("Local", "WebDav"), result.data)
+    }
+
+    @Test
+    fun `getDriverInfo 404 (unknown driver) surfaces as a Failure, not a crash`() = runTest {
+        coEvery { api.adminDriverInfo("Bogus") } returns ApiResponse(code = 404, message = "not found", data = null)
+
+        val result = repository.getDriverInfo(INSTANCE_ID, "Bogus")
+
+        assertTrue(result is ApiResult.Failure)
+        assertEquals(DomainError.NotFound, (result as ApiResult.Failure).error)
     }
 
     private companion object {
