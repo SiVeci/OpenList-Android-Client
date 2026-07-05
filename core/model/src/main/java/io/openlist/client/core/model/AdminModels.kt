@@ -152,8 +152,13 @@ data class AdminIndexProgress(
  * token/secret/password/key keyword — defense in depth in case the backend
  * ever under-flags a sensitive setting. [value] must already be blanked by
  * the repository layer when [isPrivate] is true before this model is
- * constructed (never rely on UI to mask it after the fact).
+ * constructed (never rely on UI to mask it after the fact). `@Serializable`
+ * (S7) for the same reason as the S3 user/storage models: `admin_cache
+ * .rawJson` stores this type's `Json.encodeToString` output directly — by
+ * the time that happens [value] has already been blanked for private items,
+ * so the cached JSON itself never carries a raw secret (P-507).
  */
+@Serializable
 data class AdminSettingItem(
     val key: String,
     val value: String?,

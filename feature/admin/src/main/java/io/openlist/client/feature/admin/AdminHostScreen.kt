@@ -75,6 +75,7 @@ fun AdminHostScreen(
                 onRetryStorage = viewModel::refreshStorageSummary,
                 onRetryTask = viewModel::refreshTaskSummary,
                 onRetryIndex = viewModel::refreshIndexSummary,
+                onLoadWebFallback = viewModel::refreshOverviewWebFallback,
             )
         }
     }
@@ -102,9 +103,11 @@ private fun AdminAccessDeniedScreen(
 /**
  * ALLOWED-only scaffold: top bar (shows current instance name per PRD §12.1
  * "避免跨实例误操作"), scrollable [AdminTabRow] (7 tabs), and the selected
- * tab's content. [AdminTab.OVERVIEW]/[AdminTab.USERS]/[AdminTab.STORAGES]/
- * [AdminTab.TASKS]/[AdminTab.INDEX] have real content as of S6; [AdminTab
- * .SETTINGS]/[AdminTab.ADVANCED] still render [AdminComingSoon] (S7 scope).
+ * tab's content. All 7 [AdminTab] entries now have real content as of S7:
+ * [AdminTab.OVERVIEW]/[AdminTab.USERS]/[AdminTab.STORAGES]/[AdminTab.TASKS]/
+ * [AdminTab.INDEX] since S3-S6, [AdminTab.SETTINGS]/[AdminTab.ADVANCED] as of
+ * this Sprint -- the `when` below is exhaustive over [AdminTab]'s 7 values
+ * with no placeholder branch left.
  */
 @Composable
 private fun AdminScaffold(
@@ -116,6 +119,7 @@ private fun AdminScaffold(
     onRetryStorage: () -> Unit,
     onRetryTask: () -> Unit,
     onRetryIndex: () -> Unit,
+    onLoadWebFallback: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -145,17 +149,17 @@ private fun AdminScaffold(
                 AdminTab.STORAGES -> AdminStorageTab(instanceId = instanceId)
                 AdminTab.TASKS -> AdminTaskTab(instanceId = instanceId)
                 AdminTab.INDEX -> AdminIndexTab(instanceId = instanceId)
-                else -> AdminComingSoon(tab = uiState.selectedTab)
+                AdminTab.SETTINGS -> AdminSettingsTab(
+                    instanceId = instanceId,
+                    webFallback = uiState.overviewWebFallback,
+                    onLoadWebFallback = onLoadWebFallback,
+                )
+                AdminTab.ADVANCED -> AdminAdvancedTab(
+                    webFallback = uiState.overviewWebFallback,
+                    onLoadWebFallback = onLoadWebFallback,
+                    onRetryWebFallback = onLoadWebFallback,
+                )
             }
         }
     }
-}
-
-@Composable
-private fun AdminComingSoon(tab: AdminTab) {
-    EmptyState(
-        title = "${tab.label} · 即将上线",
-        modifier = Modifier.fillMaxSize(),
-        description = "该功能计划在后续 Sprint 中提供",
-    )
 }

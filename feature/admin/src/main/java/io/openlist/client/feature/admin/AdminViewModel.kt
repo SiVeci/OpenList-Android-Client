@@ -14,7 +14,9 @@ import io.openlist.client.core.domain.AdminWebFallbackRepository
 import io.openlist.client.core.domain.AuthRepository
 import io.openlist.client.core.domain.InstanceRepository
 import io.openlist.client.core.model.AdminAccessState
+import io.openlist.client.core.model.AdminWebSection
 import io.openlist.client.core.model.UnifiedTaskStatus
+import io.openlist.client.core.model.WebFallbackTarget
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -66,6 +68,12 @@ data class AdminUiState(
     val storageSummary: AdminCardState<AdminStorageSummaryCard> = AdminCardState.Loading,
     val taskSummary: AdminCardState<AdminTaskSummaryCard> = AdminCardState.Loading,
     val indexSummary: AdminCardState<AdminIndexSummaryCard> = AdminCardState.Loading,
+    /** Lightweight Web-fallback entry card on the Overview tab (S7-T4, PRD
+     * §12.2) -- shares the exact same [AdminCardState]/[AdminWebFallbackRepository
+     * .buildAdminUrl] plumbing the Advanced tab's full card uses, just a
+     * lighter-weight entry point (no unsupported-capabilities list/safety-note
+     * body text on Overview, only the button). */
+    val overviewWebFallback: AdminCardState<WebFallbackTarget> = AdminCardState.Loading,
 )
 
 /**
@@ -175,6 +183,9 @@ class AdminViewModel @Inject constructor(
         if (state.indexSummary is AdminCardState.Loading || state.indexSummary is AdminCardState.Failed) {
             refreshIndexSummary()
         }
+        if (state.overviewWebFallback is AdminCardState.Loading || state.overviewWebFallback is AdminCardState.Failed) {
+            refreshOverviewWebFallback()
+        }
     }
 
     fun refreshStorageSummary() {
@@ -227,6 +238,26 @@ class AdminViewModel @Inject constructor(
                 }
                 is ApiResult.Failure -> _uiState.update {
                     it.copy(indexSummary = AdminCardState.Failed(result.error.toUserMessage()))
+                }
+            }
+        }
+    }
+
+    /**
+     * Builds the Web-fallback target shown by the Overview tab's lightweight
+     * entry card (S7-T4). [AdminWebSection.HOME] is used since this entry
+     * point isn't scoped to any one admin section -- unlike the Advanced
+     * tab's card (also [AdminWebSection.HOME] today, since no per-section URL
+     * fragment is confirmed at all; see [io.openlist.client.core.domain
+     * .AdminWebFallbackRepository]'s KDoc).
+     */
+    fun refreshOverviewWebFallback() {
+        _uiState.update { it.copy(overviewWebFallback = AdminCardState.Loading) }
+        viewModelScope.launch {
+            when (val result = adminWebFallbackRepository.buildAdminUrl(instanceId, AdminWebSection.HOME)) {
+                is ApiResult.Success -> _uiState.update { it.copy(overviewWebFallback = AdminCardState.Loaded(result.data)) }
+                is ApiResult.Failure -> _uiState.update {
+                    it.copy(overviewWebFallback = AdminCardState.Failed(result.error.toUserMessage()))
                 }
             }
         }

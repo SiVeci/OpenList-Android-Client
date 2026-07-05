@@ -1,6 +1,7 @@
 package io.openlist.client.feature.admin
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -18,9 +19,17 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import io.openlist.client.core.designsystem.Spacing
+import io.openlist.client.core.model.WebFallbackTarget
 
 /**
  * Overview Tab content (v0.5_EXECUTION_PLAN.md §11 S2-T4). Instance-info
@@ -32,6 +41,15 @@ import io.openlist.client.core.designsystem.Spacing
  * in S4/S5, and `AdminIndexRepository` in S6 (this file itself needed no
  * changes for that -- see `AdminViewModel.refreshIndexSummary`, which already
  * called the real interface method starting S2).
+ *
+ * The Web-fallback entry card (S7-T4) is now real: it loads a
+ * [WebFallbackTarget] the same way the Advanced tab's `WebFallbackCard` does
+ * (shared [AdminUiState.overviewWebFallback] slice, loaded once per Tab visit
+ * via [onLoadOverviewCards] -> [AdminViewModel.refreshOverviewWebFallback]),
+ * but renders a lighter-weight single-button treatment here rather than that
+ * card's full safety-note/copy-URL-fallback body -- this Overview entry is
+ * meant as a quick jump-off point, not the primary interaction surface (that
+ * lives on the Advanced tab).
  */
 @Composable
 fun AdminOverviewTab(
@@ -71,7 +89,7 @@ fun AdminOverviewTab(
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
-        AdminWebFallbackPlaceholderCard()
+        AdminWebFallbackEntryCard(state = uiState.overviewWebFallback)
     }
 }
 
@@ -115,18 +133,53 @@ private fun <T> AdminSummaryCard(
     }
 }
 
-/** Static placeholder card (S7 wires this to `AdminWebFallbackRepository`) --
- * intentionally not clickable/enabled this Sprint. */
+/**
+ * Lightweight Web-fallback entry (S7-T4, PRD §12.2) -- lit up from S2's
+ * static/disabled-looking placeholder. Tapping the row (once loaded) launches
+ * the same external-browser [openInExternalBrowser] Intent the Advanced tab's
+ * full `WebFallbackCard` uses, with the same "打开失败 -> 复制链接" fallback,
+ * just condensed into a single card here (no separate safety-note/
+ * unsupported-capabilities body -- that full treatment is the Advanced tab's
+ * job per the brief's "Overview has a lightweight entry, Advanced has the
+ * full card" split).
+ */
 @Composable
-private fun AdminWebFallbackPlaceholderCard() {
+private fun AdminWebFallbackEntryCard(state: AdminCardState<WebFallbackTarget>) {
+    val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
+    var launchError by remember { mutableStateOf<String?>(null) }
+
     AdminCardContainer {
         Text("Web 管理台兜底入口", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.size(Spacing.xxs))
-        Text(
-            text = "即将上线，敬请期待",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        when (state) {
+            is AdminCardState.Loading -> CircularProgressIndicator(modifier = Modifier.padding(vertical = Spacing.xs))
+            is AdminCardState.Failed -> Text(
+                text = state.message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            is AdminCardState.Loaded -> {
+                val target = state.data
+                Text(
+                    text = "在浏览器中打开 Web 管理台",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        launchError = openInExternalBrowser(context, target.url)
+                    },
+                )
+                launchError?.let { message ->
+                    Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    Text(
+                        text = "复制链接",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.clickable { clipboardManager.setText(AnnotatedString(target.url)) },
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -141,3 +194,4 @@ private fun AdminCardContainer(content: @Composable ColumnScope.() -> Unit) {
         Column(modifier = Modifier.fillMaxWidth().padding(Spacing.md), content = content)
     }
 }
+
