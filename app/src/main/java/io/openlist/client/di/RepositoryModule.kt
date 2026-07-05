@@ -4,6 +4,13 @@ import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import io.openlist.client.core.domain.AdminGateRepository
+import io.openlist.client.core.domain.AdminIndexRepository
+import io.openlist.client.core.domain.AdminSettingsRepository
+import io.openlist.client.core.domain.AdminStorageRepository
+import io.openlist.client.core.domain.AdminTaskRepository
+import io.openlist.client.core.domain.AdminUserRepository
+import io.openlist.client.core.domain.AdminWebFallbackRepository
 import io.openlist.client.core.domain.AuthRepository
 import io.openlist.client.core.domain.DirectoryPickerRepository
 import io.openlist.client.core.domain.ExternalOpenRepository
@@ -21,6 +28,13 @@ import io.openlist.client.core.domain.TaskRepository
 import io.openlist.client.core.domain.TransferRepository
 import io.openlist.client.core.domain.UploadRepository
 import io.openlist.client.data.repository.AndroidMimeTypeResolver
+import io.openlist.client.data.repository.AdminGateRepositoryImpl
+import io.openlist.client.data.repository.AdminIndexRepositoryImpl
+import io.openlist.client.data.repository.AdminSettingsRepositoryImpl
+import io.openlist.client.data.repository.AdminStorageRepositoryImpl
+import io.openlist.client.data.repository.AdminTaskRepositoryImpl
+import io.openlist.client.data.repository.AdminUserRepositoryImpl
+import io.openlist.client.data.repository.AdminWebFallbackRepositoryImpl
 import io.openlist.client.data.repository.AuthRepositoryImpl
 import io.openlist.client.data.repository.DirectoryPickerRepositoryImpl
 import io.openlist.client.data.repository.ExternalOpenRepositoryImpl
@@ -110,4 +124,32 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindMimeTypeResolver(impl: AndroidMimeTypeResolver): MimeTypeResolver
+
+    @Binds
+    @Singleton
+    abstract fun bindAdminGateRepository(impl: AdminGateRepositoryImpl): AdminGateRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAdminUserRepository(impl: AdminUserRepositoryImpl): AdminUserRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAdminStorageRepository(impl: AdminStorageRepositoryImpl): AdminStorageRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAdminTaskRepository(impl: AdminTaskRepositoryImpl): AdminTaskRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAdminIndexRepository(impl: AdminIndexRepositoryImpl): AdminIndexRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAdminSettingsRepository(impl: AdminSettingsRepositoryImpl): AdminSettingsRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAdminWebFallbackRepository(impl: AdminWebFallbackRepositoryImpl): AdminWebFallbackRepository
 }

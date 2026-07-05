@@ -5,6 +5,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import io.openlist.client.feature.admin.AdminHostScreen
 import io.openlist.client.feature.auth.LoginScreen
 import io.openlist.client.feature.files.FileDetailScreen
 import io.openlist.client.feature.files.FileListScreen
@@ -138,6 +139,16 @@ fun OpenListNavHost(navController: NavHostController = rememberNavController()) 
             MediaPlayerScreen(
                 instanceId = instanceId,
                 path = path,
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable(Routes.ADMIN) { backStackEntry ->
+            val instanceId = backStackEntry.arguments?.getString("instanceId") ?: return@composable
+            val tab = backStackEntry.arguments?.getString("tab")
+                ?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }
+            AdminHostScreen(
+                instanceId = instanceId,
+                tab = tab,
                 onBack = { navController.popBackStack() },
             )
         }

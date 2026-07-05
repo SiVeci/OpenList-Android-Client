@@ -140,3 +140,35 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
         )
     }
 }
+
+/**
+ * Adds `admin_cache` (v0.5 Sprint 1, S1-T6, PRD §11.6). Column order/types
+ * hand-derived from `AdminCacheEntity` and cross-checked field-by-field
+ * against the hand-written `9.json` schema export added alongside this
+ * migration — same cross-check discipline as MIGRATION_5_6/MIGRATION_6_7/
+ * MIGRATION_7_8. Like MIGRATION_7_8, this could not be verified by actually
+ * running Room's KSP schema export in this sprint's environment: it is a
+ * manual derivation from the same Kotlin -> SQLite type mapping used
+ * elsewhere in this file (String -> TEXT, Long -> INTEGER, nullable Kotlin
+ * types omit `NOT NULL`). Re-verify against a real KSP-exported schema the
+ * next time this module is built in a full Android build environment
+ * (inherits the same caveat already on record for 8.json — see KNOWN_ISSUES).
+ */
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `admin_cache` (" +
+                "`id` TEXT NOT NULL, " +
+                "`instanceId` TEXT NOT NULL, " +
+                "`scope` TEXT NOT NULL, " +
+                "`cacheKey` TEXT NOT NULL, " +
+                "`rawJson` TEXT NOT NULL, " +
+                "`cachedAt` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`id`))",
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_admin_cache_instanceId_scope_cacheKey` " +
+                "ON `admin_cache` (`instanceId`, `scope`, `cacheKey`)",
+        )
+    }
+}

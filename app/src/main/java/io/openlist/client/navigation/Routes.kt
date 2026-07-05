@@ -20,6 +20,12 @@ object Routes {
     const val TASK_CENTER = "task_center/{instanceId}"
     const val PREVIEW = "preview/{instanceId}?path={path}"
     const val MEDIA_PLAYER = "player/{instanceId}?path={path}"
+    /** Single sprint-wide host route for the whole admin console (v0.5_EXECUTION_PLAN.md
+     * §5.4/§9.2): the 7 admin sections are Tabs inside one host screen, not one route each,
+     * to avoid navigation-graph bloat. `tab` is optional and only used for deep-linking
+     * into a specific Tab (e.g. a "no search index" error state jumping straight to the
+     * Index tab) — same optional-query-param style as [FILE_LIST]/[SEARCH]. */
+    const val ADMIN = "admin/{instanceId}?tab={tab}"
 
     fun login(instanceId: String) = "login/$instanceId"
     fun fileList(instanceId: String, path: String = "/") = "files/$instanceId?path=${encodePathArg(path)}"
@@ -30,6 +36,8 @@ object Routes {
     fun taskCenter(instanceId: String) = "task_center/$instanceId"
     fun preview(instanceId: String, path: String) = "preview/$instanceId?path=${encodePathArg(path)}"
     fun mediaPlayer(instanceId: String, path: String) = "player/$instanceId?path=${encodePathArg(path)}"
+    fun admin(instanceId: String, tab: String? = null) =
+        "admin/$instanceId" + (tab?.let { "?tab=${encodePathArg(it)}" } ?: "")
 
     private fun encodePathArg(path: String) =
         java.net.URLEncoder.encode(path, "UTF-8")

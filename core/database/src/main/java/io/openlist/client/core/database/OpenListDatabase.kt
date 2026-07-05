@@ -2,6 +2,7 @@ package io.openlist.client.core.database
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import io.openlist.client.core.database.dao.AdminCacheDao
 import io.openlist.client.core.database.dao.DownloadTaskDao
 import io.openlist.client.core.database.dao.FileCacheDao
 import io.openlist.client.core.database.dao.InstanceDao
@@ -11,6 +12,7 @@ import io.openlist.client.core.database.dao.SearchHistoryDao
 import io.openlist.client.core.database.dao.SessionDao
 import io.openlist.client.core.database.dao.ShareDao
 import io.openlist.client.core.database.dao.UploadTaskDao
+import io.openlist.client.core.database.entity.AdminCacheEntity
 import io.openlist.client.core.database.entity.DownloadTaskEntity
 import io.openlist.client.core.database.entity.FileCacheEntity
 import io.openlist.client.core.database.entity.InstanceEntity
@@ -34,8 +36,9 @@ import io.openlist.client.core.database.entity.UploadTaskEntity
         SearchHistoryEntity::class,
         RemoteTaskEntity::class,
         PreviewCacheEntity::class,
+        AdminCacheEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class OpenListDatabase : RoomDatabase() {
@@ -48,4 +51,5 @@ abstract class OpenListDatabase : RoomDatabase() {
     abstract fun searchHistoryDao(): SearchHistoryDao
     abstract fun remoteTaskDao(): RemoteTaskDao
     abstract fun previewCacheDao(): PreviewCacheDao
+    abstract fun adminCacheDao(): AdminCacheDao
 }

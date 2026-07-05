@@ -104,6 +104,7 @@ dependencies {
     implementation(project(":feature:search"))
     implementation(project(":feature:task"))
     implementation(project(":feature:preview"))
+    implementation(project(":feature:admin"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

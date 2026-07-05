@@ -26,6 +26,14 @@ sealed class DomainError {
     data object MediaSourceExpired : DomainError()
     /** No installed app (and no web fallback) can open this file externally. */
     data object ExternalOpenUnavailable : DomainError()
+    /** Current session is not an admin, or the server rejected an
+     * admin API call with 403 (v0.5_EXECUTION_PLAN.md §10.6/PRD §14.1).
+     * Distinct from [Forbidden] so admin-gate UI can show copy specific to
+     * "not an admin" rather than the generic permission-denied message. */
+    data object AdminAccessDenied : DomainError()
+    /** An admin API endpoint is missing/incompatible on this backend
+     * version (PRD §16.4.4 "后端版本差异导致某个 admin 接口不可用"). */
+    data object AdminApiUnavailable : DomainError()
     data class OpenListError(val code: Int?, val message: String) : DomainError()
     data class Unknown(val throwable: Throwable?) : DomainError()
 }
@@ -49,6 +57,8 @@ fun DomainError.toUserMessage(): String = when (this) {
     DomainError.MediaUnsupported -> "该格式暂不支持播放"
     DomainError.MediaSourceExpired -> "播放地址已失效，请重试"
     DomainError.ExternalOpenUnavailable -> "没有可处理该文件的应用"
+    DomainError.AdminAccessDenied -> "当前账号不是管理员或无管理权限"
+    DomainError.AdminApiUnavailable -> "当前实例不支持该管理能力"
     is DomainError.OpenListError -> message.ifBlank { "请求失败${code?.let { " ($it)" } ?: ""}" }
     is DomainError.Unknown -> "出现未知错误，请重试"
 }

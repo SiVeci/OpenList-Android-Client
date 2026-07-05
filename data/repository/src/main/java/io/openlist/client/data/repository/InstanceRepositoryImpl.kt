@@ -4,6 +4,7 @@ import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.openlist.client.core.common.ApiResult
 import io.openlist.client.core.common.DomainError
+import io.openlist.client.core.database.dao.AdminCacheDao
 import io.openlist.client.core.database.dao.DownloadTaskDao
 import io.openlist.client.core.database.dao.FileCacheDao
 import io.openlist.client.core.database.dao.InstanceDao
@@ -37,6 +38,7 @@ class InstanceRepositoryImpl @Inject constructor(
     private val searchHistoryDao: SearchHistoryDao,
     private val remoteTaskDao: RemoteTaskDao,
     private val previewCacheDao: PreviewCacheDao,
+    private val adminCacheDao: AdminCacheDao,
     private val clientFactory: OpenListClientFactory,
     @ApplicationContext private val context: Context,
 ) : InstanceRepository {
@@ -93,6 +95,8 @@ class InstanceRepositoryImpl @Inject constructor(
         searchHistoryDao.deleteByInstanceId(id)
         remoteTaskDao.deleteByInstanceId(id)
         previewCacheDao.deleteByInstanceId(id)
+        // v0.5 admin console cache (PRD §11.6/§17.2.8: "删除实例时清理管理缓存").
+        adminCacheDao.deleteByInstanceId(id)
         // Preview content bodies live under cacheDir/preview/<instanceId>/, not
         // in any DAO-owned table (P-415), so the on-disk cache is cleaned up
         // directly here too — best-effort, matching the rest of this method's

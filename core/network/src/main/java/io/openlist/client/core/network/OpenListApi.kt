@@ -2,6 +2,14 @@ package io.openlist.client.core.network
 
 import io.openlist.client.core.network.dto.AddOfflineDownloadReq
 import io.openlist.client.core.network.dto.AddOfflineDownloadResp
+import io.openlist.client.core.network.dto.AdminDriverInfoMap
+import io.openlist.client.core.network.dto.AdminIndexProgressDto
+import io.openlist.client.core.network.dto.AdminIndexUpdateReq
+import io.openlist.client.core.network.dto.AdminSettingDto
+import io.openlist.client.core.network.dto.AdminStorageDto
+import io.openlist.client.core.network.dto.AdminStoragePageDto
+import io.openlist.client.core.network.dto.AdminUserDto
+import io.openlist.client.core.network.dto.AdminUserPageDto
 import io.openlist.client.core.network.dto.ApiResponse
 import io.openlist.client.core.network.dto.FsGetReq
 import io.openlist.client.core.network.dto.FsGetResp
@@ -142,4 +150,126 @@ interface OpenListApi {
 
     @POST("api/task/{type}/cancel")
     suspend fun taskCancel(@Path("type") type: String, @Query("tid") tid: String): ApiResponse<JsonElement?>
+
+    // ---- Admin (v0.5) ----
+    // All admin/* paths sit behind the server's `AuthAdmin` middleware
+    // (403 "You are not an admin" for non-admin callers, confirmed against
+    // `openlist-ref/server/middlewares/auth.go`); AdminGateRepository (S2) is
+    // the sole gate that must run before any of these are called from UI.
+
+    /** [page]/[perPage] — `model.PageReq` (`page`/`per_page` query params). */
+    @GET("api/admin/user/list")
+    suspend fun adminUserList(@Query("page") page: Int, @Query("per_page") perPage: Int): ApiResponse<AdminUserPageDto>
+
+    @GET("api/admin/user/get")
+    suspend fun adminUserGet(@Query("id") id: Int): ApiResponse<AdminUserDto>
+
+    @GET("api/admin/storage/list")
+    suspend fun adminStorageList(@Query("page") page: Int, @Query("per_page") perPage: Int): ApiResponse<AdminStoragePageDto>
+
+    @GET("api/admin/storage/get")
+    suspend fun adminStorageGet(@Query("id") id: Int): ApiResponse<AdminStorageDto>
+
+    /** `data` is empty/absent on success (`common.SuccessResp(c)`, no payload). */
+    @POST("api/admin/storage/enable")
+    suspend fun adminStorageEnable(@Query("id") id: Int): ApiResponse<JsonElement?>
+
+    @POST("api/admin/storage/disable")
+    suspend fun adminStorageDisable(@Query("id") id: Int): ApiResponse<JsonElement?>
+
+    /** Asynchronous: the server responds 200 immediately and continues
+     * reloading storages on a background goroutine (`LoadAllStorages`,
+     * `openlist-ref/server/handles/storage.go`) — callers must present this as
+     * "reload submitted", not "reload completed" (PRD §13.2). */
+    @POST("api/admin/storage/load_all")
+    suspend fun adminStorageLoadAll(): ApiResponse<JsonElement?>
+
+    /** `op.GetDriverInfoMap()` — driver name -> `driver.Info` metadata tree. */
+    @GET("api/admin/driver/list")
+    suspend fun adminDriverList(): ApiResponse<Map<String, JsonElement>>
+
+    @GET("api/admin/driver/names")
+    suspend fun adminDriverNames(): ApiResponse<List<String>>
+
+    @GET("api/admin/driver/info")
+    suspend fun adminDriverInfo(@Query("driver") driver: String): ApiResponse<AdminDriverInfoMap>
+
+    // Admin task endpoints reuse the same 7 backend path segments as the
+    // non-admin api/task/{type}/* group (`SetupTaskRoute` mounts identically
+    // at both `auth.Group("/task", AuthNotGuest)` and `admin.Group("/task")`,
+    // `openlist-ref/server/router.go`); the admin mount additionally returns
+    // every user's tasks, not just the caller's own. `info`/`cancel`/`retry`/
+    // `delete` are POST with a `tid` query param (confirmed against
+    // `openlist-ref/server/handles/task.go` `taskRoute`), not the PRD table's
+    // assumed GET for `info`.
+
+    @GET("api/admin/task/{type}/undone")
+    suspend fun adminTaskUndone(@Path("type") type: String): ApiResponse<List<TaskInfoDto>>
+
+    @GET("api/admin/task/{type}/done")
+    suspend fun adminTaskDone(@Path("type") type: String): ApiResponse<List<TaskInfoDto>>
+
+    @POST("api/admin/task/{type}/info")
+    suspend fun adminTaskInfo(@Path("type") type: String, @Query("tid") tid: String): ApiResponse<TaskInfoDto>
+
+    @POST("api/admin/task/{type}/cancel")
+    suspend fun adminTaskCancel(@Path("type") type: String, @Query("tid") tid: String): ApiResponse<JsonElement?>
+
+    @POST("api/admin/task/{type}/retry")
+    suspend fun adminTaskRetry(@Path("type") type: String, @Query("tid") tid: String): ApiResponse<JsonElement?>
+
+    @POST("api/admin/task/{type}/delete")
+    suspend fun adminTaskDelete(@Path("type") type: String, @Query("tid") tid: String): ApiResponse<JsonElement?>
+
+    /** Full-rebuild; async like [adminStorageLoadAll] (server spawns a goroutine
+     * and responds immediately). */
+    @POST("api/admin/index/build")
+    suspend fun adminIndexBuild(): ApiResponse<JsonElement?>
+
+    @POST("api/admin/index/update")
+    suspend fun adminIndexUpdate(@Body req: AdminIndexUpdateReq): ApiResponse<JsonElement?>
+
+    @POST("api/admin/index/stop")
+    suspend fun adminIndexStop(): ApiResponse<JsonElement?>
+
+    @POST("api/admin/index/clear")
+    suspend fun adminIndexClear(): ApiResponse<JsonElement?>
+
+    @GET("api/admin/index/progress")
+    suspend fun adminIndexProgress(): ApiResponse<AdminIndexProgressDto>
+
+    /** [group]/[groups] are mutually exclusive per `ListSettings`
+     * (`openlist-ref/server/handles/setting.go`): [groups] is a comma-joined
+     * list of int group ids, [group] a single one; both null means "all". */
+    @GET("api/admin/setting/list")
+    suspend fun adminSettingList(
+        @Query("group") group: Int? = null,
+        @Query("groups") groups: String? = null,
+    ): ApiResponse<List<AdminSettingDto>>
+
+    /**
+     * [key]/[keys] are mutually exclusive per `GetSetting`
+     * (`openlist-ref/server/handles/setting.go`) — **but the response shape
+     * differs**: with [key] the server returns one `SettingItem` object; with
+     * [keys] (comma-joined) it returns a JSON array. This single-object
+     * signature only covers the [key] case (the one S7's `getSettings`/
+     * `getDefaultSettings` actually need per PRD §10.7); a [keys]-array
+     * variant can be added alongside the real S7 implementation if a caller
+     * needs it.
+     */
+    @GET("api/admin/setting/get")
+    suspend fun adminSettingGet(@Query("key") key: String): ApiResponse<AdminSettingDto>
+
+    /**
+     * Confirmed **POST**, not GET, against `openlist-ref/server/router.go`
+     * (`setting.POST("/default", handles.DefaultSettings)`) — the S0 brief's
+     * "GET, not POST per PRD" note had the correction backwards; the actual
+     * source shows POST, matching the PRD table after all. Recorded here as a
+     * deviation from this task's own brief, not from the PRD.
+     */
+    @POST("api/admin/setting/default")
+    suspend fun adminSettingDefault(
+        @Query("group") group: Int? = null,
+        @Query("groups") groups: String? = null,
+    ): ApiResponse<List<AdminSettingDto>>
 }

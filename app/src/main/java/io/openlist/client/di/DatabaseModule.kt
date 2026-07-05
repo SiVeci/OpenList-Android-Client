@@ -11,7 +11,9 @@ import io.openlist.client.core.database.MIGRATION_4_5
 import io.openlist.client.core.database.MIGRATION_5_6
 import io.openlist.client.core.database.MIGRATION_6_7
 import io.openlist.client.core.database.MIGRATION_7_8
+import io.openlist.client.core.database.MIGRATION_8_9
 import io.openlist.client.core.database.OpenListDatabase
+import io.openlist.client.core.database.dao.AdminCacheDao
 import io.openlist.client.core.database.dao.DownloadTaskDao
 import io.openlist.client.core.database.dao.FileCacheDao
 import io.openlist.client.core.database.dao.InstanceDao
@@ -36,7 +38,7 @@ object DatabaseModule {
         Room.databaseBuilder(context, OpenListDatabase::class.java, "openlist.db")
             // v0.1.0 has shipped with real user data, so schema bumps from here on
             // require hand-written Migrations instead of a destructive fallback.
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
             .build()
 
     @Provides
@@ -65,4 +67,7 @@ object DatabaseModule {
 
     @Provides
     fun providePreviewCacheDao(database: OpenListDatabase): PreviewCacheDao = database.previewCacheDao()
+
+    @Provides
+    fun provideAdminCacheDao(database: OpenListDatabase): AdminCacheDao = database.adminCacheDao()
 }
