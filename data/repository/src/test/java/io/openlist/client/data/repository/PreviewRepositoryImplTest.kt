@@ -6,6 +6,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.openlist.client.core.auth.SessionManager
 import io.openlist.client.core.common.ApiResult
+import io.openlist.client.core.common.DispatcherProvider
 import io.openlist.client.core.common.DomainError
 import io.openlist.client.core.database.dao.PreviewCacheDao
 import io.openlist.client.core.database.entity.PreviewCacheEntity
@@ -22,6 +23,8 @@ import io.openlist.client.core.network.OpenListClientFactory
 import io.openlist.client.core.network.PreviewHttpClient
 import io.openlist.client.core.network.dto.ApiResponse
 import io.openlist.client.core.network.dto.FsGetResp
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -55,6 +58,11 @@ class PreviewRepositoryImplTest {
     private val sessionManager = mockk<SessionManager>(relaxed = true)
     private val previewCacheDao = mockk<PreviewCacheDao>(relaxed = true)
     private val previewHttpClient = PreviewHttpClient()
+    private val dispatcherProvider = object : DispatcherProvider {
+        override val io: CoroutineDispatcher = Dispatchers.Unconfined
+        override val main: CoroutineDispatcher = Dispatchers.Unconfined
+        override val default: CoroutineDispatcher = Dispatchers.Unconfined
+    }
     private val json = Json { ignoreUnknownKeys = true }
 
     private lateinit var cacheDir: File
@@ -84,6 +92,7 @@ class PreviewRepositoryImplTest {
             sessionManager = sessionManager,
             previewCacheDao = previewCacheDao,
             previewHttpClient = previewHttpClient,
+            dispatcherProvider = dispatcherProvider,
             json = json,
             context = context,
         )

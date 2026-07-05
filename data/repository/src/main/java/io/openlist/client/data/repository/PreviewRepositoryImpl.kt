@@ -4,6 +4,7 @@ import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.openlist.client.core.auth.SessionManager
 import io.openlist.client.core.common.ApiResult
+import io.openlist.client.core.common.DispatcherProvider
 import io.openlist.client.core.common.DomainError
 import io.openlist.client.core.database.dao.PreviewCacheDao
 import io.openlist.client.core.database.entity.PreviewCacheEntity
@@ -29,6 +30,7 @@ import io.openlist.client.core.network.dto.FsGetReq
 import io.openlist.client.core.network.dto.FsGetResp
 import io.openlist.client.core.network.safeApiCall
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -67,6 +69,7 @@ class PreviewRepositoryImpl @Inject constructor(
     private val sessionManager: SessionManager,
     private val previewCacheDao: PreviewCacheDao,
     private val previewHttpClient: PreviewHttpClient,
+    private val dispatcherProvider: DispatcherProvider,
     private val json: Json,
     @ApplicationContext private val context: Context,
 ) : PreviewRepository {
@@ -108,7 +111,7 @@ class PreviewRepositoryImpl @Inject constructor(
         if (!options.forceRefresh) {
             val cached = findFreshCacheRow(instanceId, normalizedPath, KIND_TEXT, fresh)
             if (cached != null) {
-                val fileBytes = runCatching { File(cached.localFilePath).readBytes() }.getOrNull()
+                val fileBytes = readCacheFile(cached.localFilePath)
                 if (fileBytes != null) {
                     val text = decodeUtf8StrippingBom(fileBytes)
                     return ApiResult.Success(
@@ -171,7 +174,7 @@ class PreviewRepositoryImpl @Inject constructor(
         if (!forceRefresh) {
             val cached = findFreshCacheRow(instanceId, normalizedPath, KIND_MARKDOWN, fresh)
             if (cached != null) {
-                val fileBytes = runCatching { File(cached.localFilePath).readBytes() }.getOrNull()
+                val fileBytes = readCacheFile(cached.localFilePath)
                 if (fileBytes != null) {
                     val text = decodeUtf8StrippingBom(fileBytes)
                     return ApiResult.Success(
@@ -213,19 +216,23 @@ class PreviewRepositoryImpl @Inject constructor(
 
     override suspend fun invalidate(instanceId: String, path: String) {
         val normalizedPath = OpenListPathCodec.normalize(path)
-        runCatching {
-            val rows = previewCacheDao.getByInstanceAndPath(instanceId, normalizedPath)
-            rows.forEach { row -> runCatching { File(row.localFilePath).delete() } }
-            previewCacheDao.deleteByInstanceAndPath(instanceId, normalizedPath)
+        withContext(dispatcherProvider.io) {
+            runCatching {
+                val rows = previewCacheDao.getByInstanceAndPath(instanceId, normalizedPath)
+                rows.forEach { row -> runCatching { File(row.localFilePath).delete() } }
+                previewCacheDao.deleteByInstanceAndPath(instanceId, normalizedPath)
+            }
         }
     }
 
     override suspend fun invalidateByPrefix(instanceId: String, pathPrefix: String) {
         val normalizedPrefix = OpenListPathCodec.normalize(pathPrefix)
-        runCatching {
-            val rows = previewCacheDao.getByPathPrefix(instanceId, normalizedPrefix)
-            rows.forEach { row -> runCatching { File(row.localFilePath).delete() } }
-            previewCacheDao.deleteByPathPrefix(instanceId, normalizedPrefix)
+        withContext(dispatcherProvider.io) {
+            runCatching {
+                val rows = previewCacheDao.getByPathPrefix(instanceId, normalizedPrefix)
+                rows.forEach { row -> runCatching { File(row.localFilePath).delete() } }
+                previewCacheDao.deleteByPathPrefix(instanceId, normalizedPrefix)
+            }
         }
     }
 
@@ -239,10 +246,10 @@ class PreviewRepositoryImpl @Inject constructor(
         path: String,
         kind: String,
         fresh: FsGetResp,
-    ): PreviewCacheEntity? {
+    ): PreviewCacheEntity? = withContext(dispatcherProvider.io) {
         val now = System.currentTimeMillis()
         val freshModified = parseTimestamp(fresh.modified)
-        return previewCacheDao.getByInstanceAndPath(instanceId, path)
+        previewCacheDao.getByInstanceAndPath(instanceId, path)
             .firstOrNull { row ->
                 val expiresAt = row.expiresAt
                 row.kind == kind &&
@@ -250,6 +257,10 @@ class PreviewRepositoryImpl @Inject constructor(
                     row.sizeBytes == fresh.size &&
                     (expiresAt == null || expiresAt > now)
             }
+    }
+
+    private suspend fun readCacheFile(path: String): ByteArray? = withContext(dispatcherProvider.io) {
+        runCatching { File(path).readBytes() }.getOrNull()
     }
 
     /** Writes [bytes] to a stable, filesystem-safe file under
@@ -260,30 +271,32 @@ class PreviewRepositoryImpl @Inject constructor(
      * trivially derivable from each other (the digest exists only because a
      * raw OpenList path contains '/' and can't be a single file name). */
     private suspend fun persistCacheBody(instanceId: String, path: String, kind: String, bytes: ByteArray, fresh: FsGetResp) {
-        runCatching {
-            val cacheKey = "$instanceId:$path:$kind"
-            val fileName = sha256Hex(cacheKey)
-            val dir = File(context.cacheDir, "preview/$instanceId").apply { mkdirs() }
-            val file = File(dir, fileName)
-            file.writeBytes(bytes)
+        withContext(dispatcherProvider.io) {
+            runCatching {
+                val cacheKey = "$instanceId:$path:$kind"
+                val fileName = sha256Hex(cacheKey)
+                val dir = File(context.cacheDir, "preview/$instanceId").apply { mkdirs() }
+                val file = File(dir, fileName)
+                file.writeBytes(bytes)
 
-            val now = System.currentTimeMillis()
-            previewCacheDao.upsert(
-                PreviewCacheEntity(
-                    id = fileName,
-                    instanceId = instanceId,
-                    path = path,
-                    kind = kind,
-                    mimeType = null,
-                    lastModified = parseTimestamp(fresh.modified),
-                    cacheKey = cacheKey,
-                    localFilePath = file.absolutePath,
-                    sizeBytes = fresh.size,
-                    etag = null,
-                    expiresAt = now + PREVIEW_CACHE_TTL_MILLIS,
-                    cachedAt = now,
-                ),
-            )
+                val now = System.currentTimeMillis()
+                previewCacheDao.upsert(
+                    PreviewCacheEntity(
+                        id = fileName,
+                        instanceId = instanceId,
+                        path = path,
+                        kind = kind,
+                        mimeType = null,
+                        lastModified = parseTimestamp(fresh.modified),
+                        cacheKey = cacheKey,
+                        localFilePath = file.absolutePath,
+                        sizeBytes = fresh.size,
+                        etag = null,
+                        expiresAt = now + PREVIEW_CACHE_TTL_MILLIS,
+                        cachedAt = now,
+                    ),
+                )
+            }
         }
     }
 
@@ -305,24 +318,26 @@ class PreviewRepositoryImpl @Inject constructor(
      * underlying OkHttp call instead of leaking it.
      */
     private suspend fun streamReadCapped(instanceId: String, url: String, capBytes: Long): ApiResult<Pair<ByteArray, Boolean>> {
-        val call = previewHttpClient.client.newCall(Request.Builder().url(url).get().build())
-        val response = try {
-            executeCancellable(call)
-        } catch (io: IOException) {
-            return ApiResult.Failure(DomainError.NetworkUnavailable)
-        }
-
-        return response.use { resp ->
-            if (!resp.isSuccessful) {
-                if (resp.code == 401) sessionManager.invalidate(instanceId)
-                return@use ApiResult.Failure(mapHttpError(resp))
-            }
-            val body = resp.body ?: return@use ApiResult.Success(ByteArray(0) to false)
-            try {
-                val (bytes, truncated) = readCapped(body.byteStream(), capBytes)
-                ApiResult.Success(bytes to truncated)
+        return withContext(dispatcherProvider.io) {
+            val call = previewHttpClient.client.newCall(Request.Builder().url(url).get().build())
+            val response = try {
+                executeCancellable(call)
             } catch (io: IOException) {
-                ApiResult.Failure(DomainError.NetworkUnavailable)
+                return@withContext ApiResult.Failure(DomainError.NetworkUnavailable)
+            }
+
+            response.use { resp ->
+                if (!resp.isSuccessful) {
+                    if (resp.code == 401) sessionManager.invalidate(instanceId)
+                    return@use ApiResult.Failure(mapHttpError(resp))
+                }
+                val body = resp.body ?: return@use ApiResult.Success(ByteArray(0) to false)
+                try {
+                    val (bytes, truncated) = readCapped(body.byteStream(), capBytes)
+                    ApiResult.Success(bytes to truncated)
+                } catch (io: IOException) {
+                    ApiResult.Failure(DomainError.NetworkUnavailable)
+                }
             }
         }
     }
