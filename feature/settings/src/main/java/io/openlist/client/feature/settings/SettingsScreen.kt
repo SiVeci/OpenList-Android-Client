@@ -34,11 +34,14 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onOpenInstances: () -> Unit,
     onOpenTaskCenter: (instanceId: String) -> Unit,
+    onOpenAdmin: (instanceId: String) -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val loggingEnabled by viewModel.loggingEnabled.collectAsState()
     val cacheCleared by viewModel.cacheCleared.collectAsState()
     val currentInstanceId by viewModel.currentInstanceId.collectAsState()
+    val currentInstanceName by viewModel.currentInstanceName.collectAsState()
+    val adminEntryState by viewModel.adminEntryState.collectAsState()
     var showClearCacheConfirm by remember { mutableStateOf(false) }
     var showLicenses by remember { mutableStateOf(false) }
     var showClearedNotice by remember { mutableStateOf(false) }
@@ -59,6 +62,30 @@ fun SettingsScreen(
             currentInstanceId?.let { instanceId ->
                 SettingsRow(title = "任务中心", subtitle = "当前实例的上传、下载、远程任务", onClick = { onOpenTaskCenter(instanceId) })
                 HorizontalDivider()
+            }
+            when (adminEntryState) {
+                AdminEntryState.HIDDEN -> Unit
+                AdminEntryState.DISABLED_NOT_ADMIN -> {
+                    val subtitle = currentInstanceName?.let { "$it · 需要管理员权限" } ?: "需要管理员权限"
+                    SettingsRow(
+                        title = "管理台",
+                        subtitle = subtitle,
+                        enabled = false,
+                        onClick = {},
+                    )
+                    HorizontalDivider()
+                }
+                AdminEntryState.ENABLED -> {
+                    val instanceId = currentInstanceId
+                    if (instanceId != null) {
+                        SettingsRow(
+                            title = "管理台",
+                            subtitle = currentInstanceName,
+                            onClick = { onOpenAdmin(instanceId) },
+                        )
+                        HorizontalDivider()
+                    }
+                }
             }
             SettingsRow(title = "清理缓存", subtitle = "清除所有实例的本地目录缓存", onClick = { showClearCacheConfirm = true })
             HorizontalDivider()
@@ -136,14 +163,18 @@ private val OSS_LIBRARIES = listOf(
 )
 
 @Composable
-private fun SettingsRow(title: String, subtitle: String?, onClick: () -> Unit) {
+private fun SettingsRow(title: String, subtitle: String?, onClick: () -> Unit, enabled: Boolean = true) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = Spacing.md, vertical = Spacing.sm),
     ) {
-        Text(title, style = MaterialTheme.typography.bodyLarge)
+        Text(
+            title,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         if (subtitle != null) {
             Text(
                 subtitle,

@@ -81,6 +81,7 @@ fun OpenListNavHost(navController: NavHostController = rememberNavController()) 
                 onBack = { navController.popBackStack() },
                 onOpenInstances = { navController.navigate(Routes.INSTANCE_LIST) { popUpTo(0) } },
                 onOpenTaskCenter = { instanceId -> navController.navigate(Routes.taskCenter(instanceId)) },
+                onOpenAdmin = { instanceId -> navController.navigate(Routes.admin(instanceId)) },
             )
         }
         composable(Routes.SHARE_LIST) { backStackEntry ->
@@ -150,6 +151,9 @@ fun OpenListNavHost(navController: NavHostController = rememberNavController()) 
                 instanceId = instanceId,
                 tab = tab,
                 onBack = { navController.popBackStack() },
+                onSessionExpired = { expiredInstanceId ->
+                    navController.navigate(Routes.login(expiredInstanceId)) { popUpTo(0) }
+                },
             )
         }
     }
