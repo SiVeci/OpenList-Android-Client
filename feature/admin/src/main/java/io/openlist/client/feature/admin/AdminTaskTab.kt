@@ -113,6 +113,17 @@ fun AdminTaskTab(
                     label = { Text("已完成") },
                 )
             }
+            // Batch operations (v1.0 S5-T2/T3, DEC-603 subset A) only show
+            // once a specific type is picked -- the backend endpoints are
+            // per-type, there is no "all types" batch call to dispatch "全部" to.
+            uiState.selectedType?.let { type ->
+                AdminTaskBatchActionsRow(
+                    typeLabel = type.label,
+                    onClearDone = viewModel::requestClearDone,
+                    onClearSucceeded = viewModel::requestClearSucceeded,
+                    onRetryFailed = viewModel::requestRetryFailed,
+                )
+            }
             uiState.pollErrorMessage?.let { message ->
                 ErrorBar(message = message, modifier = Modifier.fillMaxWidth())
             }
@@ -188,6 +199,38 @@ private fun AdminTaskFilterRow(
     }
 }
 
+/** Batch actions row (v1.0 S5-T2/T3): "清理已完成"/"清理已成功" use the danger
+ * style (PRD §12.6/§11.3 "清理类用危险样式"), "重试全部失败" doesn't (retrying
+ * is reversible/low-risk, same precedent as [io.openlist.client.feature.task
+ * .TaskCenterViewModel.retryTask]'s no-confirmation choice — except here a
+ * confirm is still required since it's a *batch*, not a single item). */
+@Composable
+private fun AdminTaskBatchActionsRow(
+    typeLabel: String,
+    onClearDone: () -> Unit,
+    onClearSucceeded: () -> Unit,
+    onRetryFailed: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.xs)) {
+        Text(
+            "批量操作（$typeLabel）",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(top = Spacing.xs),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+        ) {
+            androidx.compose.material3.OutlinedButton(onClick = onClearDone) { Text("清理已完成") }
+            androidx.compose.material3.OutlinedButton(onClick = onClearSucceeded) { Text("清理已成功") }
+            androidx.compose.material3.OutlinedButton(onClick = onRetryFailed) { Text("重试全部失败") }
+        }
+    }
+}
+
 @Composable
 private fun AdminTaskConfirmDialog(uiState: AdminTaskListUiState, viewModel: AdminTaskListViewModel) {
     when (val dialog = uiState.dialog) {
@@ -217,6 +260,35 @@ private fun AdminTaskConfirmDialog(uiState: AdminTaskListUiState, viewModel: Adm
             onDismiss = viewModel::dismissDialog,
             confirmText = "删除",
             danger = true,
+            loading = uiState.dialogLoading,
+            errorMessage = uiState.dialogError,
+        )
+        is AdminTaskDialog.ClearDoneConfirm -> ConfirmDialog(
+            title = "清理已完成记录",
+            message = "确定清理「${dialog.type.label}」全部已完成的任务记录吗？此操作不可撤销，影响范围为该类型下的所有已完成记录（成功/取消/失败）。",
+            onConfirm = viewModel::confirmDialog,
+            onDismiss = viewModel::dismissDialog,
+            confirmText = "清理",
+            danger = true,
+            loading = uiState.dialogLoading,
+            errorMessage = uiState.dialogError,
+        )
+        is AdminTaskDialog.ClearSucceededConfirm -> ConfirmDialog(
+            title = "清理已成功记录",
+            message = "确定清理「${dialog.type.label}」全部已成功的任务记录吗？此操作不可撤销，影响范围为该类型下的所有已成功记录。",
+            onConfirm = viewModel::confirmDialog,
+            onDismiss = viewModel::dismissDialog,
+            confirmText = "清理",
+            danger = true,
+            loading = uiState.dialogLoading,
+            errorMessage = uiState.dialogError,
+        )
+        is AdminTaskDialog.RetryFailedConfirm -> ConfirmDialog(
+            title = "重试全部失败任务",
+            message = "确定重试「${dialog.type.label}」全部失败的任务吗？影响范围为该类型下当前所有失败状态的任务。",
+            onConfirm = viewModel::confirmDialog,
+            onDismiss = viewModel::dismissDialog,
+            confirmText = "重试",
             loading = uiState.dialogLoading,
             errorMessage = uiState.dialogError,
         )

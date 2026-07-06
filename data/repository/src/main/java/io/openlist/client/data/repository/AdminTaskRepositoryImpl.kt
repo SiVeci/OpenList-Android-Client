@@ -136,6 +136,15 @@ class AdminTaskRepositoryImpl @Inject constructor(
     override suspend fun deleteTaskRecord(instanceId: String, taskType: String, tid: String): ApiResult<Unit> =
         performTaskOperation(instanceId, taskType) { api -> api.adminTaskDelete(taskType, tid) }
 
+    override suspend fun clearDone(instanceId: String, taskType: String): ApiResult<Unit> =
+        performTaskOperation(instanceId, taskType) { api -> api.adminTaskClearDone(taskType) }
+
+    override suspend fun clearSucceeded(instanceId: String, taskType: String): ApiResult<Unit> =
+        performTaskOperation(instanceId, taskType) { api -> api.adminTaskClearSucceeded(taskType) }
+
+    override suspend fun retryFailed(instanceId: String, taskType: String): ApiResult<Unit> =
+        performTaskOperation(instanceId, taskType) { api -> api.adminTaskRetryFailed(taskType) }
+
     private suspend fun performTaskOperation(
         instanceId: String,
         taskType: String,

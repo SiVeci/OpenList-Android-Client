@@ -256,6 +256,54 @@ class AdminTaskRepositoryImplTest {
         coVerify(exactly = 1) { sessionManager.invalidate(INSTANCE_ID) }
     }
 
+    // ---- batch operations (v1.0 S5-T2, DEC-603 subset A) ----
+
+    @Test
+    fun `clearDone calls the clear_done endpoint for the given type and refreshes both buckets`() = runTest {
+        coEvery { api.adminTaskClearDone("upload") } returns ApiResponse(code = 200, data = null)
+        coEvery { api.adminTaskUndone(any()) } returns ApiResponse(code = 200, data = emptyList())
+        coEvery { api.adminTaskDone(any()) } returns ApiResponse(code = 200, data = emptyList())
+
+        val result = repository.clearDone(INSTANCE_ID, "upload")
+
+        assertTrue(result is ApiResult.Success)
+        coVerify(exactly = 1) { api.adminTaskClearDone("upload") }
+        coVerify(exactly = 1) { api.adminTaskDone("upload") }
+    }
+
+    @Test
+    fun `clearSucceeded calls the clear_succeeded endpoint for the given type`() = runTest {
+        coEvery { api.adminTaskClearSucceeded("copy") } returns ApiResponse(code = 200, data = null)
+        coEvery { api.adminTaskUndone(any()) } returns ApiResponse(code = 200, data = emptyList())
+        coEvery { api.adminTaskDone(any()) } returns ApiResponse(code = 200, data = emptyList())
+
+        val result = repository.clearSucceeded(INSTANCE_ID, "copy")
+
+        assertTrue(result is ApiResult.Success)
+        coVerify(exactly = 1) { api.adminTaskClearSucceeded("copy") }
+    }
+
+    @Test
+    fun `retryFailed calls the retry_failed endpoint for the given type`() = runTest {
+        coEvery { api.adminTaskRetryFailed("move") } returns ApiResponse(code = 200, data = null)
+        coEvery { api.adminTaskUndone(any()) } returns ApiResponse(code = 200, data = emptyList())
+        coEvery { api.adminTaskDone(any()) } returns ApiResponse(code = 200, data = emptyList())
+
+        val result = repository.retryFailed(INSTANCE_ID, "move")
+
+        assertTrue(result is ApiResult.Success)
+        coVerify(exactly = 1) { api.adminTaskRetryFailed("move") }
+    }
+
+    @Test
+    fun `clearDone surfaces the backend's error message verbatim on failure`() = runTest {
+        coEvery { api.adminTaskClearDone("upload") } returns ApiResponse(code = 403, message = "admin only", data = null)
+
+        val result = repository.clearDone(INSTANCE_ID, "upload")
+
+        assertTrue(result is ApiResult.Failure)
+    }
+
     // ---- zero Room writes: structural proof ----
 
     @Test

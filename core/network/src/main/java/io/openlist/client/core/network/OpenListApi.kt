@@ -232,6 +232,23 @@ interface OpenListApi {
     @POST("api/admin/task/{type}/delete")
     suspend fun adminTaskDelete(@Path("type") type: String, @Query("tid") tid: String): ApiResponse<JsonElement?>
 
+    /**
+     * Batch task operations (v1.0_PRD §4.2.F.3, DEC-603 subset A). V-610
+     * confirmed all 6 batch endpoints exist and are mounted at both
+     * `/api/task/{type}/...` and `/api/admin/task/{type}/...`; only these 3
+     * no-request-body ones are wired into the admin UI (`cancel_some`/
+     * `delete_some`/`retry_some` need a tid-array request body and aren't in
+     * PRD scope — recorded Parity Deferred).
+     */
+    @POST("api/admin/task/{type}/clear_done")
+    suspend fun adminTaskClearDone(@Path("type") type: String): ApiResponse<JsonElement?>
+
+    @POST("api/admin/task/{type}/clear_succeeded")
+    suspend fun adminTaskClearSucceeded(@Path("type") type: String): ApiResponse<JsonElement?>
+
+    @POST("api/admin/task/{type}/retry_failed")
+    suspend fun adminTaskRetryFailed(@Path("type") type: String): ApiResponse<JsonElement?>
+
     /** Full-rebuild; async like [adminStorageLoadAll] (server spawns a goroutine
      * and responds immediately). */
     @POST("api/admin/index/build")

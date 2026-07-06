@@ -37,4 +37,20 @@ interface AdminTaskRepository {
     /** UI must restrict this action to done-class tasks (server-side behavior
      * for undone tasks is unconfirmed — V-505); requires two-step confirm. */
     suspend fun deleteTaskRecord(instanceId: String, taskType: String, tid: String): ApiResult<Unit>
+
+    /**
+     * Batch operations (v1.0_PRD §4.2.F.3, DEC-603 subset A — only these 3 of
+     * the 6 existing batch endpoints are wired; `cancel_some`/`delete_some`/
+     * `retry_some` need a tid-array request body and are out of PRD scope,
+     * recorded Parity Deferred). No per-item result: the response carries no
+     * failure list (V-610), so the UI can only report operation-level
+     * success/failure and must refresh afterward rather than infer which
+     * records changed. All three require a danger-style confirm with the
+     * affected task type and scope shown (PRD §11.3).
+     */
+    suspend fun clearDone(instanceId: String, taskType: String): ApiResult<Unit>
+
+    suspend fun clearSucceeded(instanceId: String, taskType: String): ApiResult<Unit>
+
+    suspend fun retryFailed(instanceId: String, taskType: String): ApiResult<Unit>
 }

@@ -5,7 +5,10 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.openlist.client.core.common.ApiResult
 import io.openlist.client.core.common.toUserMessage
+import io.openlist.client.core.designsystem.components.DirectoryPickerContent
+import io.openlist.client.core.designsystem.components.DirectoryPickerEntry
 import io.openlist.client.core.domain.AdminIndexRepository
+import io.openlist.client.core.domain.DirectoryPickerRepository
 import io.openlist.client.core.model.AdminIndexProgress
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -45,6 +48,14 @@ data class AdminIndexUiState(
     val dialogLoading: Boolean = false,
     val dialogError: String? = null,
     val snackbarMessage: String? = null,
+    /** Path "更新索引" will submit — v1.0 S5-T1, reuses the same directory
+     * tree the admin's own session can browse (DirectoryPickerRepository is
+     * the ordinary fs/list channel, not an admin-only one). Defaults to "/"
+     * (DEC-504's original default, still offered as the common case). */
+    val updatePath: String = "/",
+    /** Non-null while the path picker sheet is open. */
+    val pickerPath: String? = null,
+    val pickerContent: DirectoryPickerContent = DirectoryPickerContent.Loading,
 )
 
 /**
@@ -71,6 +82,7 @@ data class AdminIndexUiState(
 @HiltViewModel
 class AdminIndexListViewModel @Inject constructor(
     private val adminIndexRepository: AdminIndexRepository,
+    private val directoryPickerRepository: DirectoryPickerRepository,
 ) : ViewModel() {
 
     private var instanceId: String? = null
@@ -168,21 +180,22 @@ class AdminIndexListViewModel @Inject constructor(
     }
 
     /**
-     * Dispatches to the repository call matching the open dialog. DEC-504
-     * means [AdminIndexRepository.updateIndex]'s call site here relies
-     * entirely on its default arguments (`paths=["/"]`, `maxDepth=-1`) -- no
-     * directory-picker UI exists in v0.5 (PRD's optional "时间允许再做"
-     * enhancement, explicitly skipped this Sprint). On success: dismiss +
-     * snackbar + an immediate [refresh] (not waiting for the next poll tick,
-     * per brief) -- build/update/stop/clear all mutate server-side progress
-     * state that [refresh] alone can observe.
+     * Dispatches to the repository call matching the open dialog. v1.0 S5-T1:
+     * "更新索引" now submits [AdminIndexUiState.updatePath] (picked via
+     * [openPathPicker], defaulting to DEC-504's "/") instead of always relying
+     * on [AdminIndexRepository.updateIndex]'s default arguments; `maxDepth`
+     * still uses the repository default (`-1`, confirmed reliable by V-609 —
+     * DEC-604 resolved to keep it, no UI control needed for it). On success:
+     * dismiss + snackbar + an immediate [refresh] (not waiting for the next
+     * poll tick, per brief) -- build/update/stop/clear all mutate server-side
+     * progress state that [refresh] alone can observe.
      */
     fun confirmDialog() {
         val id = instanceId ?: return
         val dialog = _uiState.value.dialog ?: return
         val call: suspend () -> ApiResult<Unit> = when (dialog) {
             AdminIndexDialog.BuildConfirm -> { { adminIndexRepository.buildIndex(id) } }
-            AdminIndexDialog.UpdateConfirm -> { { adminIndexRepository.updateIndex(id) } }
+            AdminIndexDialog.UpdateConfirm -> { { adminIndexRepository.updateIndex(id, paths = listOf(_uiState.value.updatePath)) } }
             AdminIndexDialog.StopConfirm -> { { adminIndexRepository.stopIndex(id) } }
             AdminIndexDialog.ClearConfirm -> { { adminIndexRepository.clearIndex(id) } }
         }
@@ -204,6 +217,61 @@ class AdminIndexListViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    // ---- Update-index path picker (v1.0 S5-T1) --------------------------------
+
+    fun openPathPicker() {
+        _uiState.update { it.copy(pickerPath = it.updatePath) }
+        loadPickerEntries()
+    }
+
+    fun pickerEnterDirectory(entry: DirectoryPickerEntry) {
+        _uiState.update { it.copy(pickerPath = entry.path) }
+        loadPickerEntries()
+    }
+
+    fun pickerNavigateToSegment(segmentCount: Int) {
+        val path = _uiState.value.pickerPath ?: return
+        _uiState.update { it.copy(pickerPath = pathForSegmentCount(path, segmentCount)) }
+        loadPickerEntries()
+    }
+
+    fun pickerRefresh() = loadPickerEntries()
+
+    fun dismissPathPicker() {
+        _uiState.update { it.copy(pickerPath = null) }
+    }
+
+    fun confirmPathPicker() {
+        val path = _uiState.value.pickerPath ?: return
+        _uiState.update { it.copy(updatePath = path, pickerPath = null) }
+    }
+
+    private fun loadPickerEntries() {
+        val id = instanceId ?: return
+        val path = _uiState.value.pickerPath ?: return
+        _uiState.update { it.copy(pickerContent = DirectoryPickerContent.Loading) }
+        viewModelScope.launch {
+            when (val result = directoryPickerRepository.listDirectories(id, path)) {
+                is ApiResult.Success -> {
+                    val entries = result.data.map { DirectoryPickerEntry(it.name, it.path) }
+                    _uiState.update { it.copy(pickerContent = DirectoryPickerContent.Content(entries)) }
+                }
+                is ApiResult.Failure -> _uiState.update {
+                    it.copy(pickerContent = DirectoryPickerContent.Error(result.error.toUserMessage()))
+                }
+            }
+        }
+    }
+
+    /** `:feature:admin` deliberately has no dependency on `core:network`
+     * (see build.gradle.kts comment), so this doesn't reuse
+     * `OpenListPathCodec` — same trivial segment-rebuild logic, kept local. */
+    private fun pathForSegmentCount(path: String, count: Int): String {
+        val segments = path.trim('/').split('/').filter { it.isNotEmpty() }
+        if (count <= 0 || segments.isEmpty()) return "/"
+        return "/" + segments.take(count.coerceAtMost(segments.size)).joinToString("/")
     }
 
     private companion object {

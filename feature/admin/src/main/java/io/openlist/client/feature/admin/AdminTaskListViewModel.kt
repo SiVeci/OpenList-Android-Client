@@ -39,6 +39,13 @@ sealed class AdminTaskDialog {
     data class CancelConfirm(val task: AdminTask) : AdminTaskDialog()
     data class RetryConfirm(val task: AdminTask) : AdminTaskDialog()
     data class DeleteConfirm(val task: AdminTask) : AdminTaskDialog()
+
+    /** Batch operations (v1.0 S5-T2/T3, DEC-603 subset A) — always scoped to
+     * one [type], never "全部类型", since the backend endpoint itself is
+     * per-type (there is no "all types" batch call). */
+    data class ClearDoneConfirm(val type: AdminTaskType) : AdminTaskDialog()
+    data class ClearSucceededConfirm(val type: AdminTaskType) : AdminTaskDialog()
+    data class RetryFailedConfirm(val type: AdminTaskType) : AdminTaskDialog()
 }
 
 data class AdminTaskListUiState(
@@ -197,6 +204,24 @@ class AdminTaskListViewModel @Inject constructor(
         _uiState.update { it.copy(dialog = AdminTaskDialog.DeleteConfirm(task), dialogError = null) }
     }
 
+    /** Batch action buttons only show when a specific type is selected (no
+     * "全部类型" batch call exists), so these three always have a non-null
+     * [AdminTaskListUiState.selectedType] to read here. */
+    fun requestClearDone() {
+        val type = _uiState.value.selectedType ?: return
+        _uiState.update { it.copy(dialog = AdminTaskDialog.ClearDoneConfirm(type), dialogError = null) }
+    }
+
+    fun requestClearSucceeded() {
+        val type = _uiState.value.selectedType ?: return
+        _uiState.update { it.copy(dialog = AdminTaskDialog.ClearSucceededConfirm(type), dialogError = null) }
+    }
+
+    fun requestRetryFailed() {
+        val type = _uiState.value.selectedType ?: return
+        _uiState.update { it.copy(dialog = AdminTaskDialog.RetryFailedConfirm(type), dialogError = null) }
+    }
+
     fun dismissDialog() {
         _uiState.update { it.copy(dialog = null, dialogLoading = false, dialogError = null) }
     }
@@ -219,11 +244,17 @@ class AdminTaskListViewModel @Inject constructor(
             is AdminTaskDialog.CancelConfirm -> { { adminTaskRepository.cancelTask(id, dialog.task.taskType, dialog.task.id) } }
             is AdminTaskDialog.RetryConfirm -> { { adminTaskRepository.retryTask(id, dialog.task.taskType, dialog.task.id) } }
             is AdminTaskDialog.DeleteConfirm -> { { adminTaskRepository.deleteTaskRecord(id, dialog.task.taskType, dialog.task.id) } }
+            is AdminTaskDialog.ClearDoneConfirm -> { { adminTaskRepository.clearDone(id, dialog.type.apiValue) } }
+            is AdminTaskDialog.ClearSucceededConfirm -> { { adminTaskRepository.clearSucceeded(id, dialog.type.apiValue) } }
+            is AdminTaskDialog.RetryFailedConfirm -> { { adminTaskRepository.retryFailed(id, dialog.type.apiValue) } }
         }
         val successMessage = when (dialog) {
             is AdminTaskDialog.CancelConfirm -> "已取消"
             is AdminTaskDialog.RetryConfirm -> "已提交重试"
             is AdminTaskDialog.DeleteConfirm -> "已删除"
+            is AdminTaskDialog.ClearDoneConfirm -> "已清理「${dialog.type.label}」的已完成记录"
+            is AdminTaskDialog.ClearSucceededConfirm -> "已清理「${dialog.type.label}」的已成功记录"
+            is AdminTaskDialog.RetryFailedConfirm -> "已提交重试「${dialog.type.label}」的失败任务"
         }
         _uiState.update { it.copy(dialogLoading = true, dialogError = null) }
         viewModelScope.launch {

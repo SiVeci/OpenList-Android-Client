@@ -25,8 +25,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.material3.MaterialTheme
 import io.openlist.client.core.designsystem.Spacing
 import io.openlist.client.core.designsystem.components.ConfirmDialog
+import io.openlist.client.core.designsystem.components.DirectoryPickerSheet
 import io.openlist.client.core.designsystem.components.EmptyState
 import io.openlist.client.core.designsystem.components.ErrorBar
 import io.openlist.client.core.designsystem.components.LoadingState
@@ -98,6 +100,7 @@ fun AdminIndexTab(
                         ErrorBar(message = message)
                     }
                     IndexProgressPanel(progress = progress)
+                    AdminUpdatePathRow(path = uiState.updatePath, onPickPath = viewModel::openPathPicker)
                     AdminIndexActionButtons(
                         onBuild = viewModel::requestBuild,
                         onUpdate = viewModel::requestUpdate,
@@ -110,6 +113,40 @@ fun AdminIndexTab(
     }
 
     AdminIndexConfirmDialog(uiState = uiState, viewModel = viewModel)
+
+    uiState.pickerPath?.let { pickerPath ->
+        DirectoryPickerSheet(
+            title = "选择更新索引的路径",
+            breadcrumbSegments = listOf("根目录") + pickerPath.trim('/').split('/').filter { it.isNotEmpty() },
+            content = uiState.pickerContent,
+            onSegmentClick = { index -> viewModel.pickerNavigateToSegment(index) },
+            onEnterDirectory = { entry -> viewModel.pickerEnterDirectory(entry) },
+            onSelectCurrent = { viewModel.confirmPathPicker() },
+            onRefresh = { viewModel.pickerRefresh() },
+            onDismiss = { viewModel.dismissPathPicker() },
+        )
+    }
+}
+
+/** "更新索引" 的目标路径 + 选择入口（v1.0 S5-T1）。maxDepth 固定使用仓储默认值
+ * "-1"（DEC-604/V-609 确认可靠，不提供 UI 控制），此处只说明其含义。 */
+@Composable
+private fun AdminUpdatePathRow(path: String, onPickPath: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Text("更新索引路径", style = MaterialTheme.typography.titleSmall)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Text(path, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = onPickPath) { Text("选择路径") }
+        }
+        Text(
+            "深度：不限深度（默认覆盖所选路径下全部子目录）",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 @Composable
@@ -159,7 +196,7 @@ private fun AdminIndexConfirmDialog(uiState: AdminIndexUiState, viewModel: Admin
         )
         AdminIndexDialog.UpdateConfirm -> ConfirmDialog(
             title = "更新索引",
-            message = "确定更新根目录 “/” 下的搜索索引吗？该操作将在后台进行。",
+            message = "确定更新路径 “${uiState.updatePath}” 下的搜索索引吗？将不限深度覆盖其全部子目录，该操作将在后台进行。",
             onConfirm = viewModel::confirmDialog,
             onDismiss = viewModel::dismissDialog,
             confirmText = "更新",
