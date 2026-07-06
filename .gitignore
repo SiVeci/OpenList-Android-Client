@@ -1,6 +1,7 @@
 # Gradle files
 .gradle/
 build/
+.kotlin/
 
 # Local configuration file (sdk path, etc)
 local.properties
@@ -26,9 +27,20 @@ render.experimental.xml
 # Keystore files
 *.jks
 *.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+*.cer
+*.crt
+keystore.properties
+signing.properties
+release.properties
 
 # Google Services (e.g. APIs or Firebase)
 google-services.json
+play-publisher*.json
+service-account*.json
 
 # Android Profiling
 *.hprof
@@ -36,3 +48,38 @@ google-services.json
 # Local build/reference artifacts (not part of the app)
 build-output.log
 /openlist-ref/
+
+# Local environment/secrets
+.env
+.env.*
+!.env.example
+secrets.properties
+
+# Local test/device artifacts outside Gradle build dirs
+coverage/
+test-results/
+reports/
+*.ec
+*.exec
+*.prof
+*.trace
+device-logs/
+adb-logs/
+screenshots/
+screenrecordings/
+*.db
+*.db-wal
+*.db-shm
+
+# Local scratch/temporary notes
+scratch/
+tmp/
+temp/
+*_LOCAL_NOTES.md
+*_SCRATCH.md
+*_SESSION_LOG.md
+*_WORK_LOG.md
+
+# Local project/process docs
+*.md
+!README.md
