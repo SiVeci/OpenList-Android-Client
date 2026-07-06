@@ -16,6 +16,10 @@ object Routes {
     const val SETTINGS = "settings"
     const val SHARE_LIST = "share_list/{instanceId}"
     const val SHARE_DETAIL = "share_detail/{instanceId}/{shareId}"
+    /** No instanceId: resolving a pasted link searches every configured
+     * instance (v1.0_PRD §4.2.D.2), it isn't scoped to the one the user
+     * happened to enter from — same instance-agnostic pattern as [SETTINGS]. */
+    const val SHARE_OPEN = "share_open"
     const val SEARCH = "search/{instanceId}?path={path}"
     const val TASK_CENTER = "task_center/{instanceId}"
     const val PREVIEW = "preview/{instanceId}?path={path}"

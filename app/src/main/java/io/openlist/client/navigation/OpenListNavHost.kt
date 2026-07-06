@@ -17,6 +17,7 @@ import io.openlist.client.feature.search.SearchScreen
 import io.openlist.client.feature.settings.SettingsScreen
 import io.openlist.client.feature.share.ShareDetailScreen
 import io.openlist.client.feature.share.ShareListScreen
+import io.openlist.client.feature.share.ShareOpenScreen
 import io.openlist.client.feature.task.TaskCenterScreen
 
 @Composable
@@ -89,7 +90,11 @@ fun OpenListNavHost(navController: NavHostController = rememberNavController()) 
             ShareListScreen(
                 onBack = { navController.popBackStack() },
                 onOpenShareDetail = { shareId -> navController.navigate(Routes.shareDetail(instanceId, shareId)) },
+                onOpenShareLink = { navController.navigate(Routes.SHARE_OPEN) },
             )
+        }
+        composable(Routes.SHARE_OPEN) {
+            ShareOpenScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.SHARE_DETAIL) { backStackEntry ->
             val instanceId = backStackEntry.arguments?.getString("instanceId") ?: return@composable

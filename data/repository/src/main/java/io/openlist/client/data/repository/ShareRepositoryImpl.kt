@@ -7,20 +7,28 @@ import io.openlist.client.core.database.entity.ShareEntity
 import io.openlist.client.core.domain.InstanceRepository
 import io.openlist.client.core.domain.ShareRepository
 import io.openlist.client.core.model.Share
+import io.openlist.client.core.model.ShareInboundInfo
+import io.openlist.client.core.model.ShareInboundTarget
 import io.openlist.client.core.model.ShareWriteRequest
 import io.openlist.client.core.network.InstanceContext
 import io.openlist.client.core.network.InstanceScope
 import io.openlist.client.core.network.OpenListApi
 import io.openlist.client.core.network.OpenListClientFactory
+import io.openlist.client.core.network.ShareUrlParser
+import io.openlist.client.core.network.dto.FsGetReq
 import io.openlist.client.core.network.dto.SharingResp
 import io.openlist.client.core.network.dto.UpdateSharingReq
 import io.openlist.client.core.network.safeApiCall
 import io.openlist.client.core.network.safeApiCallUnit
+import io.openlist.client.core.network.toApiResult
+import io.openlist.client.core.network.toDomainError
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -111,10 +119,76 @@ class ShareRepositoryImpl @Inject constructor(
         return result
     }
 
-    /** `/@s/{sid}` matches the backend's `/sd/:sid` download-link family
-     * (server/router.go); pending confirmation against a real Web share page (V-01). */
+    /** `/@s/{sid}` — confirmed v1.0 V-607a against `server/router.go`/
+     * `internal/bootstrap/data/setting.go`'s `{{base_url}}/@s/{{id}}` template. */
     override fun buildShareUrl(instanceBaseUrl: String, id: String): String =
         "${instanceBaseUrl.trimEnd('/')}/@s/$id"
+
+    override suspend fun resolveInboundUrl(url: String): ShareInboundTarget? {
+        val parsed = ShareUrlParser.parse(url) ?: return null
+        val instances = instanceRepository.observeAll().first()
+        val match = instances.firstOrNull { instance ->
+            val instanceUrl = instance.baseUrl.toHttpUrlOrNull() ?: return@firstOrNull false
+            instanceUrl.scheme == parsed.scheme && instanceUrl.host == parsed.host && instanceUrl.port == parsed.port
+        } ?: return null
+        return ShareInboundTarget(
+            instanceId = match.id,
+            baseUrl = match.baseUrl,
+            sid = parsed.sid,
+            path = parsed.path,
+            sourceUrl = url,
+        )
+    }
+
+    override suspend fun getInboundShare(
+        instanceId: String,
+        sid: String,
+        path: String?,
+        password: String?,
+    ): ApiResult<ShareInboundInfo> {
+        val api = apiFor(instanceId) ?: return ApiResult.Failure(DomainError.InvalidInstance)
+        val sharePath = buildSharePath(sid, path)
+        return try {
+            val response = api.fsGet(FsGetReq(path = sharePath, password = password.orEmpty()))
+            when (val result = response.toApiResult()) {
+                is ApiResult.Success -> ApiResult.Success(
+                    ShareInboundInfo(
+                        sid = sid,
+                        path = path.orEmpty(),
+                        name = result.data.name,
+                        isDir = result.data.isDir,
+                        size = result.data.size,
+                        rawUrl = result.data.rawUrl,
+                    ),
+                )
+                is ApiResult.Failure -> ApiResult.Failure(mapShareError(response.code, response.message, result.error))
+            }
+        } catch (t: Throwable) {
+            ApiResult.Failure(t.toDomainError())
+        }
+    }
+
+    private fun buildSharePath(sid: String, path: String?): String =
+        if (path.isNullOrBlank()) "/@s/$sid" else "/@s/$sid/${path.trimStart('/')}"
+
+    /**
+     * V-607c: wrong/missing share password is HTTP 200 + envelope `code=403,
+     * message="wrong share code"` — indistinguishable from a real permission
+     * error by code alone, so the message is inspected here (not in shared
+     * `codeToDomainError`, which is share-agnostic) before falling back to the
+     * generic mapping. Expired/disabled shares (envelope `code=500`) and any
+     * other share-specific failure keep the backend's own message rather than
+     * collapsing to the generic `ServerError` copy, since it's the more
+     * specific and actionable text (PRD §12.2). 401 is left to the normal
+     * Unauthorized handling — this repository never touches SessionManager
+     * itself, matching every other method in this file.
+     */
+    private fun mapShareError(code: Int, message: String, fallback: DomainError): DomainError = when {
+        code == 401 -> fallback
+        code == 403 && message.contains("wrong share code", ignoreCase = true) -> DomainError.SharePasswordRequired
+        code in 400..599 -> DomainError.OpenListError(code, message)
+        else -> fallback
+    }
 
     private suspend fun apiFor(instanceId: String): OpenListApi? {
         val instance = instanceRepository.getById(instanceId) ?: return null

@@ -53,6 +53,12 @@ sealed class DomainError {
     /** A local download task can't be cancelled: not in a cancellable
      * (ENQUEUED/RUNNING) state — v1.0_PRD §12.1. */
     data object DownloadCancelUnavailable : DomainError()
+    /** An inbound share link couldn't be resolved: unparseable, or its host
+     * doesn't match any configured instance (v1.0_PRD §12.1). */
+    data object ShareLinkUnsupported : DomainError()
+    /** A share requires a password that wasn't supplied or was wrong
+     * (v1.0_PRD §12.1; V-607c: server signal is 403 "wrong share code"). */
+    data object SharePasswordRequired : DomainError()
     data class OpenListError(val code: Int?, val message: String) : DomainError()
     data class Unknown(val throwable: Throwable?) : DomainError()
 }
@@ -82,6 +88,8 @@ fun DomainError.toUserMessage(): String = when (this) {
     DomainError.OtpInvalid -> "两步验证码错误或已过期，请重新输入"
     DomainError.UploadRetryUnavailable -> "该任务当前无法重试，文件可能已不可访问，请重新选择上传"
     DomainError.DownloadCancelUnavailable -> "该任务当前无法取消"
+    DomainError.ShareLinkUnsupported -> "无法解析该分享链接，请检查地址或在浏览器中打开"
+    DomainError.SharePasswordRequired -> "该分享需要密码"
     is DomainError.OpenListError -> message.ifBlank { "请求失败${code?.let { " ($it)" } ?: ""}" }
     is DomainError.Unknown -> "出现未知错误，请重试"
 }

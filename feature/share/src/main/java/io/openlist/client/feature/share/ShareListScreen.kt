@@ -8,7 +8,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -29,12 +33,23 @@ import io.openlist.client.core.model.Share
 fun ShareListScreen(
     onBack: () -> Unit,
     onOpenShareDetail: (shareId: String) -> Unit,
+    onOpenShareLink: () -> Unit,
     viewModel: ShareListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
     Scaffold(
-        topBar = { AppTopBar(title = "我的分享", onBack = onBack) },
+        topBar = {
+            AppTopBar(
+                title = "我的分享",
+                onBack = onBack,
+                actions = {
+                    IconButton(onClick = onOpenShareLink) {
+                        Icon(Icons.Filled.Link, contentDescription = "打开分享链接")
+                    }
+                },
+            )
+        },
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
             uiState.errorMessage?.let { message ->
