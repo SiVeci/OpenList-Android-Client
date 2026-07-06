@@ -6,9 +6,12 @@ import io.openlist.client.core.common.ApiResult
 import io.openlist.client.core.common.DomainError
 import io.openlist.client.core.database.dao.SessionDao
 import io.openlist.client.core.database.entity.SessionEntity
+import io.openlist.client.core.common.map
 import io.openlist.client.core.domain.AuthRepository
 import io.openlist.client.core.domain.InstanceRepository
 import io.openlist.client.core.model.AuthType
+import io.openlist.client.core.model.LoginResult
+import io.openlist.client.core.model.OtpChallenge
 import io.openlist.client.core.model.Session
 import io.openlist.client.core.network.InstanceContext
 import io.openlist.client.core.network.InstanceScope
@@ -17,6 +20,8 @@ import io.openlist.client.core.network.OpenListClientFactory
 import io.openlist.client.core.network.dto.LoginReq
 import io.openlist.client.core.network.dto.UserResp
 import io.openlist.client.core.network.safeApiCall
+import io.openlist.client.core.network.toApiResult
+import io.openlist.client.core.network.toDomainError
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -41,15 +46,73 @@ class AuthRepositoryImpl @Inject constructor(
     override fun observeAllSessions(): Flow<List<Session>> =
         sessionDao.observeAll().map { list -> list.map { it.toDomain() } }
 
-    override suspend fun loginWithPassword(instanceId: String, username: String, password: String): ApiResult<Session> {
+    override suspend fun loginWithPassword(
+        instanceId: String,
+        username: String,
+        password: String,
+        otpCode: String?,
+    ): ApiResult<LoginResult> {
         val api = enterInstanceScope(instanceId) ?: return ApiResult.Failure(DomainError.InvalidInstance)
-        val loginResult = safeApiCall { api.login(LoginReq(username = username, password = password)) }
-        val token = when (loginResult) {
-            is ApiResult.Success -> loginResult.data.token
-            is ApiResult.Failure -> return loginResult
+        val loginResult = safeApiCall {
+            api.login(LoginReq(username = username, password = password, otpCode = otpCode.orEmpty()))
         }
-        return bootstrapSession(instanceId, api, token, AuthType.PASSWORD)
+        return when (loginResult) {
+            is ApiResult.Success -> bootstrapSession(instanceId, api, loginResult.data.token, AuthType.PASSWORD)
+                .map { LoginResult.Success(it) }
+            is ApiResult.Failure -> otpAwareFailure(loginResult.error, instanceId, AuthType.PASSWORD, username, otpCode)
+        }
     }
+
+    override suspend fun loginWithLdap(instanceId: String, username: String, password: String): ApiResult<LoginResult> {
+        val api = enterInstanceScope(instanceId) ?: return ApiResult.Failure(DomainError.InvalidInstance)
+        return try {
+            val response = api.loginLdap(LoginReq(username = username, password = password))
+            when (val result = response.toApiResult()) {
+                is ApiResult.Success -> bootstrapSession(instanceId, api, result.data.token, AuthType.LDAP)
+                    .map { LoginResult.Success(it) }
+                is ApiResult.Failure -> ApiResult.Failure(mapLdapError(response.code, response.message, result.error))
+            }
+        } catch (t: Throwable) {
+            ApiResult.Failure(t.toDomainError())
+        }
+    }
+
+    /**
+     * V-602: the login endpoint's only 2FA signal is envelope `code=402` with
+     * a fixed message, sent identically whether this is the first missing-code
+     * attempt or a resubmission with a wrong code — the two are told apart
+     * here by whether [otpCode] was actually sent this time.
+     */
+    private fun otpAwareFailure(
+        error: DomainError,
+        instanceId: String,
+        method: AuthType,
+        username: String,
+        otpCode: String?,
+    ): ApiResult<LoginResult> {
+        if (error !is DomainError.OpenListError || error.code != 402) return ApiResult.Failure(error)
+        return if (otpCode.isNullOrBlank()) {
+            ApiResult.Success(LoginResult.NeedOtp(OtpChallenge(instanceId, method, username)))
+        } else {
+            ApiResult.Failure(DomainError.OtpInvalid)
+        }
+    }
+
+    /**
+     * V-601 (`ldap_login.go:21,26`): both "LDAP not enabled" and "this account
+     * can't use LDAP" are plain HTTP 403s distinguished only by message text.
+     * The shared `codeToDomainError` collapses any non-conflict 403 to the
+     * generic [DomainError.Forbidden] (dropping the message), which would read
+     * as a misleading "no permission" instead of "LDAP unavailable here" — so
+     * this is handled locally instead of touching the shared mapping used by
+     * every other endpoint.
+     */
+    private fun mapLdapError(code: Int, message: String, fallback: DomainError): DomainError =
+        if (code == 403 && message.contains("ldap", ignoreCase = true)) {
+            DomainError.AuthMethodUnavailable
+        } else {
+            fallback
+        }
 
     override suspend fun loginAsGuest(instanceId: String): ApiResult<Session> {
         val api = enterInstanceScope(instanceId) ?: return ApiResult.Failure(DomainError.InvalidInstance)

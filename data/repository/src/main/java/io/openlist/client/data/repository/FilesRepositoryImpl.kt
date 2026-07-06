@@ -5,11 +5,14 @@ import io.openlist.client.core.common.ApiResult
 import io.openlist.client.core.common.DomainError
 import io.openlist.client.core.database.dao.FileCacheDao
 import io.openlist.client.core.database.entity.FileCacheEntity
+import io.openlist.client.core.domain.AuthRepository
 import io.openlist.client.core.domain.FileListResult
 import io.openlist.client.core.domain.FilesRepository
 import io.openlist.client.core.domain.InstanceRepository
+import io.openlist.client.core.model.DirectoryCapability
 import io.openlist.client.core.model.FileDetail
 import io.openlist.client.core.model.FileNode
+import io.openlist.client.core.model.Session
 import io.openlist.client.core.network.InstanceContext
 import io.openlist.client.core.network.InstanceScope
 import io.openlist.client.core.network.OpenListClientFactory
@@ -32,6 +35,7 @@ class FilesRepositoryImpl @Inject constructor(
     private val clientFactory: OpenListClientFactory,
     private val instanceContext: InstanceContext,
     private val sessionManager: SessionManager,
+    private val authRepository: AuthRepository,
 ) : FilesRepository {
 
     override fun listDirectory(instanceId: String, path: String, forceRefresh: Boolean): Flow<FileListResult> = flow {
@@ -67,7 +71,7 @@ class FilesRepositoryImpl @Inject constructor(
                     normalizedPath,
                     nodes.map { it.toEntity(instanceId, normalizedPath, now) },
                 )
-                emit(FileListResult.Fresh(nodes))
+                emit(FileListResult.Fresh(nodes, resolveCapability(instanceId, result.data.write)))
             }
             is ApiResult.Failure -> {
                 if (result.error == DomainError.Unauthorized) sessionManager.invalidate(instanceId)
@@ -92,6 +96,19 @@ class FilesRepositoryImpl @Inject constructor(
 
     override suspend fun clearAllCache() {
         fileCacheDao.clearAll()
+    }
+
+    /**
+     * v1.0 V-604: `fs/list`'s `write` field alone only reflects a server-side
+     * meta ACL whitelist, not the user's own upload permission bit — the
+     * backend's actual upload gate requires both. A session-less lookup
+     * (shouldn't normally happen while browsing) is treated as no write
+     * capability rather than unknown, matching the "no confirmed grant ⇒ no"
+     * default for a definite (non-cache) response.
+     */
+    private suspend fun resolveCapability(instanceId: String, writeField: Boolean): DirectoryCapability {
+        val canWriteContent = authRepository.getSession(instanceId)?.canDo(Session.PERM_WRITE) ?: false
+        return DirectoryCapability(canWrite = writeField && canWriteContent)
     }
 
     private fun FsGetResp.toDomainDetail(path: String, instanceBaseUrl: String): FileDetail {

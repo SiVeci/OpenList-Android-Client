@@ -4,6 +4,7 @@ import io.openlist.client.core.common.ApiResult
 import io.openlist.client.core.common.DomainError
 import io.openlist.client.core.network.dto.ApiResponse
 import kotlinx.serialization.SerializationException
+import retrofit2.HttpException
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -86,6 +87,26 @@ fun Throwable.toDomainError(): DomainError = when (this) {
     is SocketTimeoutException -> DomainError.Timeout
     is UnknownHostException -> DomainError.NetworkUnavailable
     is SerializationException -> DomainError.InvalidInstance
+    // Retrofit throws this when the raw HTTP status itself is non-2xx and the
+    // body never got a chance to decode as an ApiResponse envelope — happens
+    // for reverse-proxy/gateway-level errors (bare HTML/text bodies) that never
+    // reach the OpenList backend's own JSON envelope (v1.0_EXECUTION_PLAN.md
+    // §4.3.2, V-612: confirmed reproducible for direct-link endpoints, e.g. a
+    // 416 "invalid range" text/plain body, or a bare 405 with no body at all).
+    // Reuses codeToDomainError so behavior matches an in-envelope error of the
+    // same HTTP code; the body (if any) becomes the OpenListError message.
+    is HttpException -> codeToDomainError(code(), readErrorBodyOrStatus())
     is IOException -> DomainError.NetworkUnavailable
     else -> DomainError.Unknown(this)
+}
+
+/** Best-effort read of the error body for a non-2xx response; falls back to a
+ * plain "HTTP {code}" string when the body is empty/unreadable (confirmed
+ * real case: a bare HEAD 405 with no Content-Type and no body at all). */
+private fun HttpException.readErrorBodyOrStatus(): String {
+    val bodyText = runCatching { response()?.errorBody()?.string() }
+        .getOrNull()
+        ?.trim()
+        .orEmpty()
+    return bodyText.take(500).ifBlank { "HTTP ${code()}" }
 }

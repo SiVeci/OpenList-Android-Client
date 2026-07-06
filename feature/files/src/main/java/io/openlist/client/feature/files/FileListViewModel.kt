@@ -20,6 +20,7 @@ import io.openlist.client.core.domain.InstanceRepository
 import io.openlist.client.core.domain.ShareRepository
 import io.openlist.client.core.domain.UploadRepository
 import io.openlist.client.core.model.BatchOperationFailure
+import io.openlist.client.core.model.DirectoryCapability
 import io.openlist.client.core.model.FileNode
 import io.openlist.client.core.model.PreviewKind
 import io.openlist.client.core.model.PreviewKindResolver
@@ -72,11 +73,14 @@ data class FileListUiState(
     val isRefreshing: Boolean = false,
     val fromCache: Boolean = false,
     val errorMessage: String? = null,
-    /** Guest sessions never see write entry points (v0.2_EXECUTION_PLAN.md §8.1).
-     * Logged-in sessions show them optimistically and surface 403 reactively
-     * (P5's documented fallback) rather than gating on the permission bitmask,
-     * since a pre-v0.2 session's bitmask reads 0 until its next /api/me refresh. */
-    val canWrite: Boolean = false,
+    /** Guest sessions never see write entry points (v0.2_EXECUTION_PLAN.md §8.1). */
+    val isGuest: Boolean = true,
+    /** Combined `fs/list.write` + session permission-bit result for the
+     * *current directory* (v1.0_EXECUTION_PLAN.md V-604/DirectoryCapability).
+     * `UNKNOWN` (cache-only, not yet refreshed) still shows write entries
+     * optimistically — see [canWrite] — since the backend's 403 is always the
+     * final word (PRD §4.2.B.6), not this client-side hint. */
+    val directoryCapability: DirectoryCapability = DirectoryCapability.UNKNOWN,
     val actionSheetTarget: FileNode? = null,
     val dialog: FileListDialog? = null,
     val dialogInputValue: String = "",
@@ -96,6 +100,18 @@ data class FileListUiState(
 ) {
     val allSelected: Boolean get() = nodes.isNotEmpty() && selectedPaths.size == nodes.size
     val hasActiveUploads: Boolean get() = uploadTasks.any { it.status == UploadStatus.PENDING || it.status == UploadStatus.RUNNING }
+
+    /** Whether write entry points (upload/new folder/rename/delete/move/copy/
+     * batch/share) should be shown. Guests are always hidden outright; a
+     * confirmed `canWrite=false` for this directory hides them too; `true` or
+     * unknown (cache-only) shows them optimistically, matching v0.1~v0.5
+     * behavior (backend 403 is the real gate either way). */
+    val canWrite: Boolean get() = !isGuest && directoryCapability.canWrite != false
+
+    /** True when [canWrite] is showing entries optimistically because this
+     * directory's capability hasn't been confirmed by the network yet — UI
+     * may use this to keep write-entry copy low-risk (PRD §4.2.B.6). */
+    val writeCapabilityUnknown: Boolean get() = !isGuest && directoryCapability.canWrite == null
 }
 
 @HiltViewModel
@@ -121,7 +137,7 @@ class FileListViewModel @Inject constructor(
             _uiState.update { it.copy(instanceName = instance?.name.orEmpty()) }
         }
         authRepository.observeSession(instanceId)
-            .onEach { session -> _uiState.update { it.copy(canWrite = session != null && !session.isGuest) } }
+            .onEach { session -> _uiState.update { it.copy(isGuest = session == null || session.isGuest) } }
             .launchIn(viewModelScope)
         uploadRepository.observeUploadTasks(instanceId)
             .onEach { tasks -> onUploadTasksChanged(tasks) }
@@ -143,6 +159,10 @@ class FileListViewModel @Inject constructor(
                     // isRefreshing; navigating elsewhere blanks the list until
                     // that path's own cache/network result arrives.
                     nodes = if (isSamePath) it.nodes else emptyList(),
+                    // A different directory's write capability doesn't carry
+                    // over — reset to UNKNOWN so a stale true/false from the
+                    // previous path never flashes through (v1.0 V-604).
+                    directoryCapability = if (isSamePath) it.directoryCapability else DirectoryCapability.UNKNOWN,
                     isLoading = !isSamePath || it.nodes.isEmpty(),
                     isRefreshing = forceRefresh,
                     errorMessage = null,
@@ -151,10 +171,17 @@ class FileListViewModel @Inject constructor(
             filesRepository.listDirectory(instanceId, normalized, forceRefresh).collect { result ->
                 when (result) {
                     is FileListResult.Cached -> _uiState.update {
-                        it.copy(nodes = result.nodes, fromCache = true, isLoading = false)
+                        it.copy(nodes = result.nodes, fromCache = true, isLoading = false, directoryCapability = result.capability)
                     }
                     is FileListResult.Fresh -> _uiState.update {
-                        it.copy(nodes = result.nodes, fromCache = false, isLoading = false, isRefreshing = false, errorMessage = null)
+                        it.copy(
+                            nodes = result.nodes,
+                            fromCache = false,
+                            isLoading = false,
+                            isRefreshing = false,
+                            errorMessage = null,
+                            directoryCapability = result.capability,
+                        )
                     }
                     is FileListResult.Error -> _uiState.update {
                         it.copy(

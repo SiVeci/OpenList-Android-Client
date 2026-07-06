@@ -1,7 +1,10 @@
 package io.openlist.client.core.model
 
-/** Mirrors OpenList's model.User role constants (GENERAL=0, GUEST=1, ADMIN=2). */
-enum class AuthType { PASSWORD, GUEST, TOKEN }
+/** Mirrors OpenList's model.User role constants (GENERAL=0, GUEST=1, ADMIN=2).
+ * [LDAP] added in v1.0 (v1.0_EXECUTION_PLAN.md §8/DEC-601-adjacent V-601):
+ * `SessionEntity.authType` is a String column (`AuthType.name`/`valueOf`), so
+ * this is a zero-migration addition. */
+enum class AuthType { PASSWORD, LDAP, GUEST, TOKEN }
 
 data class Session(
     val instanceId: String,

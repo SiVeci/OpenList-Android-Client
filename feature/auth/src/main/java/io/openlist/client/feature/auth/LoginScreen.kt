@@ -21,12 +21,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import io.openlist.client.core.designsystem.Spacing
+import io.openlist.client.core.designsystem.components.AdminTabRow
 import io.openlist.client.core.designsystem.components.AppTextField
 import io.openlist.client.core.designsystem.components.ErrorBar
 import io.openlist.client.core.designsystem.components.HeroHeader
 import io.openlist.client.core.designsystem.components.LoadingState
 import io.openlist.client.core.designsystem.components.PrimaryButton
 import io.openlist.client.core.designsystem.components.SecondaryButton
+
+private val METHOD_TABS = listOf("账号密码", "LDAP", "Token")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,52 +66,104 @@ fun LoginScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            if (uiState.isTokenMode) {
-                AppTextField(
-                    value = uiState.tokenInput,
-                    onValueChange = viewModel::onTokenInputChange,
-                    label = "管理员 Token",
-                    modifier = Modifier.fillMaxWidth(),
-                    supportingText = "在实例设置中重置得到的 API Token",
-                )
-                uiState.errorMessage?.let { ErrorBar(message = it) }
-                PrimaryButton(
-                    text = "登录",
-                    onClick = viewModel::loginWithToken,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = uiState.tokenInput.isNotBlank() && !uiState.isSubmitting,
-                    loading = uiState.isSubmitting,
-                )
-                TextButton(onClick = viewModel::toggleTokenMode) { Text("改用账号密码登录") }
+            if (uiState.needsOtp) {
+                OtpStep(uiState = uiState, viewModel = viewModel)
             } else {
-                AppTextField(
-                    value = uiState.username,
-                    onValueChange = viewModel::onUsernameChange,
-                    label = "用户名",
-                    modifier = Modifier.fillMaxWidth(),
+                AdminTabRow(
+                    tabs = METHOD_TABS,
+                    selectedIndex = uiState.method.ordinal,
+                    onTabSelected = { index -> viewModel.selectMethod(LoginMethod.entries[index]) },
                 )
-                AppTextField(
-                    value = uiState.password,
-                    onValueChange = viewModel::onPasswordChange,
-                    label = "密码",
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardType = KeyboardType.Password,
-                    visualTransformation = PasswordVisualTransformation(),
-                )
-                uiState.errorMessage?.let { ErrorBar(message = it) }
-                PrimaryButton(
-                    text = "登录",
-                    onClick = viewModel::loginWithPassword,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = uiState.username.isNotBlank() && uiState.password.isNotBlank() && !uiState.isSubmitting,
-                    loading = uiState.isSubmitting,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    SecondaryButton(text = "游客访问", onClick = viewModel::loginAsGuest, enabled = !uiState.isSubmitting)
-                    SecondaryButton(text = "使用 Token 登录", onClick = viewModel::toggleTokenMode, enabled = !uiState.isSubmitting)
+                when (uiState.method) {
+                    LoginMethod.PASSWORD -> CredentialsForm(uiState, viewModel, label = "密码")
+                    LoginMethod.LDAP -> CredentialsForm(uiState, viewModel, label = "LDAP 密码")
+                    LoginMethod.TOKEN -> TokenForm(uiState, viewModel)
                 }
+                if (uiState.method != LoginMethod.TOKEN) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        SecondaryButton(text = "游客访问", onClick = viewModel::loginAsGuest, enabled = !uiState.isSubmitting)
+                    }
+                }
+                Text(
+                    text = "该实例使用 SSO/WebAuthn 登录？请在浏览器中打开实例的 Web 管理台完成登录后，" +
+                        "改用「管理员 Token 登录」继续使用 App。",
+                    style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             TextButton(onClick = onSwitchInstance) { Text("切换实例") }
         }
     }
+}
+
+@Composable
+private fun CredentialsForm(uiState: LoginUiState, viewModel: LoginViewModel, label: String) {
+    AppTextField(
+        value = uiState.username,
+        onValueChange = viewModel::onUsernameChange,
+        label = "用户名",
+        modifier = Modifier.fillMaxWidth(),
+    )
+    AppTextField(
+        value = uiState.password,
+        onValueChange = viewModel::onPasswordChange,
+        label = label,
+        modifier = Modifier.fillMaxWidth(),
+        keyboardType = KeyboardType.Password,
+        visualTransformation = PasswordVisualTransformation(),
+    )
+    uiState.errorMessage?.let { ErrorBar(message = it) }
+    PrimaryButton(
+        text = "登录",
+        onClick = viewModel::submit,
+        modifier = Modifier.fillMaxWidth(),
+        enabled = uiState.username.isNotBlank() && uiState.password.isNotBlank() && !uiState.isSubmitting,
+        loading = uiState.isSubmitting,
+    )
+}
+
+@Composable
+private fun TokenForm(uiState: LoginUiState, viewModel: LoginViewModel) {
+    AppTextField(
+        value = uiState.tokenInput,
+        onValueChange = viewModel::onTokenInputChange,
+        label = "管理员 Token",
+        modifier = Modifier.fillMaxWidth(),
+        supportingText = "在实例设置中重置得到的 API Token",
+    )
+    uiState.errorMessage?.let { ErrorBar(message = it) }
+    PrimaryButton(
+        text = "登录",
+        onClick = viewModel::submit,
+        modifier = Modifier.fillMaxWidth(),
+        enabled = uiState.tokenInput.isNotBlank() && !uiState.isSubmitting,
+        loading = uiState.isSubmitting,
+    )
+}
+
+/** Inline OTP second step (DEC-601): same page, same ViewModel-held first-step
+ * credentials, no dialog/no separate route — avoids losing state on process
+ * recreation/rotation. */
+@Composable
+private fun OtpStep(uiState: LoginUiState, viewModel: LoginViewModel) {
+    Text(
+        text = "该账号已开启两步验证，请输入验证码",
+        style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
+    )
+    AppTextField(
+        value = uiState.otpCode,
+        onValueChange = viewModel::onOtpCodeChange,
+        label = "两步验证码",
+        modifier = Modifier.fillMaxWidth(),
+        keyboardType = KeyboardType.Number,
+    )
+    uiState.errorMessage?.let { ErrorBar(message = it) }
+    PrimaryButton(
+        text = "验证并登录",
+        onClick = viewModel::submit,
+        modifier = Modifier.fillMaxWidth(),
+        enabled = uiState.otpCode.isNotBlank() && !uiState.isSubmitting,
+        loading = uiState.isSubmitting,
+    )
+    TextButton(onClick = viewModel::cancelOtp) { Text("返回") }
 }

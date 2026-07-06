@@ -34,6 +34,19 @@ sealed class DomainError {
     /** An admin API endpoint is missing/incompatible on this backend
      * version (PRD §16.4.4 "后端版本差异导致某个 admin 接口不可用"). */
     data object AdminApiUnavailable : DomainError()
+    /** LDAP (or another alternate login method) isn't enabled on this
+     * instance, or this account isn't permitted to use it (v1.0_PRD §12.1;
+     * v1.0_EXECUTION_PLAN.md V-601 — both are plain HTTP 403s from the
+     * server, distinguished only by message text, so this is mapped at the
+     * Repository layer rather than by the shared code→error table). */
+    data object AuthMethodUnavailable : DomainError()
+    /** A submitted 2FA/OTP code was wrong or expired (v1.0_PRD §12.1;
+     * V-602 — the server's signal is envelope `code=402` with the *same*
+     * message regardless of whether this is the first missing-code prompt or
+     * a wrong resubmission; the Repository tells them apart by whether an
+     * `otpCode` was sent, mapping a resubmission failure to this case
+     * instead of re-issuing a "needs OTP" prompt). */
+    data object OtpInvalid : DomainError()
     data class OpenListError(val code: Int?, val message: String) : DomainError()
     data class Unknown(val throwable: Throwable?) : DomainError()
 }
@@ -59,6 +72,8 @@ fun DomainError.toUserMessage(): String = when (this) {
     DomainError.ExternalOpenUnavailable -> "没有可处理该文件的应用"
     DomainError.AdminAccessDenied -> "当前账号不是管理员或无管理权限"
     DomainError.AdminApiUnavailable -> "当前实例不支持该管理能力"
+    DomainError.AuthMethodUnavailable -> "该实例未启用此登录方式，或当前账号不允许使用"
+    DomainError.OtpInvalid -> "两步验证码错误或已过期，请重新输入"
     is DomainError.OpenListError -> message.ifBlank { "请求失败${code?.let { " ($it)" } ?: ""}" }
     is DomainError.Unknown -> "出现未知错误，请重试"
 }

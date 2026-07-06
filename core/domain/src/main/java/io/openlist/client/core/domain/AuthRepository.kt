@@ -1,6 +1,7 @@
 package io.openlist.client.core.domain
 
 import io.openlist.client.core.common.ApiResult
+import io.openlist.client.core.model.LoginResult
 import io.openlist.client.core.model.Session
 import kotlinx.coroutines.flow.Flow
 
@@ -15,7 +16,28 @@ interface AuthRepository {
     fun observeSession(instanceId: String): Flow<Session?>
     fun observeAllSessions(): Flow<List<Session>>
 
-    suspend fun loginWithPassword(instanceId: String, username: String, password: String): ApiResult<Session>
+    /**
+     * [otpCode] should be null/blank on the first attempt. If the account has
+     * 2FA enabled, the result is [LoginResult.NeedOtp] (v1.0_EXECUTION_PLAN.md
+     * V-602: server signal is envelope `code=402`); resubmit with the code the
+     * user enters. A second 402 with a non-blank [otpCode] already sent is
+     * surfaced as [io.openlist.client.core.common.DomainError.OtpInvalid], not
+     * another `NeedOtp` (avoids re-prompting as if nothing was submitted).
+     */
+    suspend fun loginWithPassword(
+        instanceId: String,
+        username: String,
+        password: String,
+        otpCode: String? = null,
+    ): ApiResult<LoginResult>
+
+    /**
+     * LDAP login (v1.0_PRD §4.2.B.1). No OTP step — V-601 confirmed the
+     * server's LDAP path has no 2FA branch, so [LoginResult.NeedOtp] never
+     * occurs for this method; the return type stays [LoginResult] only for
+     * symmetry with [loginWithPassword].
+     */
+    suspend fun loginWithLdap(instanceId: String, username: String, password: String): ApiResult<LoginResult>
 
     /** Probes GET /api/me with no token attached; fails if the instance disables guests. */
     suspend fun loginAsGuest(instanceId: String): ApiResult<Session>

@@ -61,6 +61,17 @@ interface OpenListApi {
     @POST("api/auth/login")
     suspend fun login(@Body req: LoginReq): ApiResponse<LoginResp>
 
+    /**
+     * LDAP login (v1.0_PRD §4.2.B.1; v1.0_EXECUTION_PLAN.md V-601). Reuses
+     * [LoginReq]'s username/password fields — `otpCode` is never populated for
+     * this call since the server's LDAP path has no OTP branch (source-
+     * confirmed absence in `ldap_login.go`). Failures are always plain HTTP
+     * 403 (LDAP disabled / this account not allowed) or 400 (bad credentials)
+     * or 429 (rate-limited), never an in-envelope error code.
+     */
+    @POST("api/auth/login/ldap")
+    suspend fun loginLdap(@Body req: LoginReq): ApiResponse<LoginResp>
+
     /** Reserved: login with client-side hashed password. Not wired to UI in v0.1. */
     @POST("api/auth/login/hash")
     suspend fun loginHash(@Body req: LoginHashReq): ApiResponse<LoginResp>

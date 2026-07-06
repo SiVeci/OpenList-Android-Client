@@ -2,6 +2,7 @@ package io.openlist.client.core.domain
 
 import io.openlist.client.core.common.ApiResult
 import io.openlist.client.core.common.DomainError
+import io.openlist.client.core.model.DirectoryCapability
 import io.openlist.client.core.model.FileDetail
 import io.openlist.client.core.model.FileNode
 import kotlinx.coroutines.flow.Flow
@@ -9,8 +10,16 @@ import kotlinx.coroutines.flow.Flow
 /** Emitted while listing a directory (v0.1_PRD §5.3.4 / §8.5): cache shown
  * instantly if present, then overwritten by the network result once it lands. */
 sealed class FileListResult {
-    data class Cached(val nodes: List<FileNode>, val cachedAt: Long) : FileListResult()
-    data class Fresh(val nodes: List<FileNode>) : FileListResult()
+    /** [capability] is always [DirectoryCapability.UNKNOWN] here (v1.0
+     * V-604) — the cache table stores no capability column, so a cache-only
+     * emission can't know it until the network response ([Fresh]) lands. */
+    data class Cached(
+        val nodes: List<FileNode>,
+        val cachedAt: Long,
+        val capability: DirectoryCapability = DirectoryCapability.UNKNOWN,
+    ) : FileListResult()
+
+    data class Fresh(val nodes: List<FileNode>, val capability: DirectoryCapability) : FileListResult()
 
     /** [staleCache] carries whatever was cached (or the currently-displayed
      * nodes) so the UI can keep showing them with a "cached data" notice. */
