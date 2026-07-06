@@ -1,5 +1,49 @@
 # Release Notes
 
+## v1.0.0 — 原子级对齐稳定版
+
+范围定义见 [v1.0_PRD.md](v1.0_PRD.md)，执行过程见 [v1.0_EXECUTION_PLAN.md](v1.0_EXECUTION_PLAN.md)，Sprint 记录见 [v1.0_IMPLEMENTATION_LOG.md](v1.0_IMPLEMENTATION_LOG.md)，验收见 [v1.0_ACCEPTANCE_REPORT.md](v1.0_ACCEPTANCE_REPORT.md)，与 Web 端逐项对照见 [Parity_Matrix.md](Parity_Matrix.md)。
+
+### 新增功能
+
+- **登录补齐**：LDAP 登录（`POST api/auth/login/ldap`，403 区分"未启用"/"不允许"）；2FA/OTP 内联第二步（信封 `code=402` 判定，非 HTTP 状态码）；SSO/WebAuthn 提供浏览器兜底文案 + Token 回退指引。
+- **目录级权限门控**：`fs/list.write` 字段 ∧ 会话 `CanWriteContent` 权限位组合判定（`DirectoryCapability`），比单纯依赖 `write` 字段更严格；乐观展示（true/unknown）+ 后端 403 兜底裁决，游客隐藏逻辑不变。
+- **上传失败一键重试 + 本地下载取消**：`UploadRepository.retryUpload`（校验 SAF URI 可读性后复位重新入队）；`TransferRepository.cancelDownload`（`DownloadManager.remove` 幂等处理）；任务中心接线。
+- **分享链接入站最小闭环**：App 内粘贴/剪贴板检测已配置实例的分享链接，解析展示分享基础信息、密码输入、单文件外部打开分发、复制/浏览器兜底；不做完整分享态目录浏览（范围裁剪，见 Parity Matrix）。
+- **Markdown 内嵌图片**：`markwon-image` + 受限 SchemeHandler（仅 `http(s)`/`data:`，无 `file`），同实例相对路径复用既有签名 URL 机制，外链零 Token 注入，失败不阻断正文。
+- **管理台补齐**：索引更新路径选择器（复用 `DirectoryPickerSheet`）；管理任务批量轻操作（清理已完成/已成功/重试全部失败三端点）。
+- **Token 失效全局跳转登录页**：`SessionExpiryViewModel` 在导航顶层反应式监听会话消失，修复自 v0.2 起主流程（文件/预览/上传等）401 后只有内联错误条、无法自动回到登录页的缺口（此前曾被 v0.2 验收误判为已实现）。
+- **HTTP 明文实例风险提示**：添加实例地址为 `http://` 时展示醒目风险提示（登录凭据与文件内容不加密传输），子路径/尾部斜杠地址规范化保持不变。
+- **Parity Matrix**：`Parity_Matrix.md` 首次建立，覆盖实例/登录/文件/上传/下载/增删改批量/分享/搜索/任务/预览/管理台/横切面共 12 域，逐项标注 Android 状态（Done/Partial/Web Fallback/Deferred/Not Applicable）与验收证据引用。
+
+### 技术
+
+- **`ErrorMapping` 修复**：`Throwable.toDomainError()` 新增 `HttpException` 分支，反代裸 HTTP 错误响应（400/416/405 等非信封 JSON）不再统一显示"未知错误"。
+- **`SafeLogger` 安全加固（S7 审计发现并修复）**：脱敏正则原先要求敏感 key 紧邻分隔符，JSON 引号键形式（`"password":"value"`）完全不匹配——调试日志打开时 OTP/密码等请求体可能明文落 logcat；`otp_code` 字段此前也完全不在脱敏关键字清单内。均已修复并补充单测。
+- **`DomainError` 新增 8 个子类**：`AuthMethodUnavailable`/`OtpInvalid`/`UploadRetryUnavailable`/`DownloadCancelUnavailable`/`ShareLinkUnsupported`/`SharePasswordRequired` 等，遵循既有统一错误文案表风格。
+- **Room 保持 version=9，零迁移**：本轮全部补齐项通过内存态/组合判定/复用既有列实现，未新增表或字段；S6 real-machine 验证了 Room 8→9 真实升级路径（v0.4 基线数据 → v1.0 原地升级，数据完整保留 + `admin_cache` 新表正确创建）。
+- **`:feature:files` 新增单测规避的一处 UX 一致性问题（S7 审计发现并修复）**：批量选择工具栏在多选期间目录能力降级为确认 `false` 时未跟随退出选择模式（后端 403 仍是最终裁决，非安全绕过）。
+- **`app` 模块首批单元测试**：`SessionExpiryViewModelTest`（3 项），此前 `testDebugUnitTest` 对该模块恒为 `NO-SOURCE`。
+- **versionCode = 6，versionName = "1.0.0"**。
+
+### 安全审计
+
+S7 阶段两个独立 subagent 审计（安全脱敏面、缓存/多实例隔离 + 权限门控回归面）：审计一发现 `SafeLogger` 的 JSON 请求体脱敏漏洞与 OTP 字段缺失（已修复+补测）；审计二发现批量选择栏的能力降级 UX 一致性问题（已修复，非安全漏洞）。其余全部审计面（分享入站零缓存写入、Markdown 图片零 Token 注入、`deleteInstance` 级联覆盖新表、管理台结构性门控）均确认无问题。详见 [v1.0_ACCEPTANCE_REPORT.md](v1.0_ACCEPTANCE_REPORT.md)。
+
+### 真机/模拟器验收
+
+`Medium_Phone` AVD（API 36）全程验证，含 Room 8→9 真实升级路径（v0.4 完成点基线数据 → 原地升级安装 → 数据完整保留）、HTTP 明文实例真机连接、真实 NAS 实例（`nas.siveci.com:18443`）多层真实目录浏览/预览/播放全流程。API 29 真机/模拟器因本轮环境限制未覆盖，按 DEC-605 记入 Parity Matrix 差异项，不阻塞验收。
+
+### 已知限制
+
+见 [KNOWN_ISSUES.md](KNOWN_ISSUES.md)。分享入站不支持完整分享态目录浏览（范围裁剪）；LDAP/2FA 真机端到端演示、成功解析他人分享的完整展示均因缺少对应权限测试账号，由单元测试覆盖代码路径正确性、真机演示留待测试账号到位后补充；`PreviewRepository.refreshPreviewUrl` 是 v0.4 遗留的零调用方死代码，本轮未清理（不影响任何真实功能路径）。
+
+### 下一步
+
+见 [v1.0_PRD.md](v1.0_PRD.md) 中 Full_PRD 记录的长期方向；可选范围（搜索分页/类型筛选、分享列表筛选、管理台搜索增强、最近预览等）见 v1.0_PRD §4.3，留待后续版本评估。
+
+---
+
 ## v0.5.0 — 轻量管理台版
 
 范围定义见 [v0.5_PRD.md](v0.5_PRD.md)，执行过程见 [v0.5_EXECUTION_PLAN.md](v0.5_EXECUTION_PLAN.md)，Sprint 记录见 [v0.5_IMPLEMENTATION_LOG.md](v0.5_IMPLEMENTATION_LOG.md)，验收见 [v0.5_ACCEPTANCE_REPORT.md](v0.5_ACCEPTANCE_REPORT.md)。

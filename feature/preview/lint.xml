@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!--
+        Media3/ExoPlayer's playback surfaces are broadly @UnstableApi-marked
+        upstream; every call site in this module already opts in via
+        @file:OptIn(UnstableApi::class) / @OptIn(UnstableApi::class), but AGP's
+        lint (as of this project's tooling version) doesn't always recognize
+        those in-source opt-ins for this particular experimental annotation
+        and re-flags them as UnsafeOptInUsageError. Registering the
+        project-wide opt-in here (the fix lint's own error message
+        recommends) lets `lintDebug` actually pass and stay useful for
+        genuinely new findings, without disabling the check entirely.
+    -->
+    <issue id="UnsafeOptInUsageError">
+        <option name="opt-in" value="androidx.media3.common.util.UnstableApi" />
+    </issue>
+</lint>

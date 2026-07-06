@@ -1,45 +1,42 @@
-# Known Issues (v0.5.0)
+# Known Issues (v1.0.0)
 
-v0.1~v0.4 的已知限制见文末历史章节。以下是 v0.5 范围内已知的限制。
+v0.1~v0.5 的已知限制见文末历史章节。以下是 v1.0 范围内已知的限制。**与 Web 端的完整逐项对照（12 域、Done/Partial/Web Fallback/Deferred/Not Applicable 分级）见 [Parity_Matrix.md](Parity_Matrix.md)**，本节只收录 Parity Matrix 之外需要单独说明的修复记录与遗留缺口。
 
-## v1.0 进行中记录（S0~S7 陆续更新，S8 定稿前的中间态，本节届时会并入正式发布说明）
+## v1.0.0 本轮新增/修复记录
 
-- **Token 失效自动跳转登录页（DEC-608，S6 修复）**：`SessionManager.invalidate()` 自 v0.2 起只删除本地 session 行、从不导航——`v0.2_ACCEPTANCE_REPORT.md` 曾将"Token 失效回登录页"标记为 Accepted，但实际只有管理台流程有自己的 `SESSION_EXPIRED` 跳转，主流程（文件/预览/上传等）401 后只显示内联错误条，用户此前只能靠"设置→实例管理→进入"手动回到登录页。v1.0 S6 已修复：新增 `app/navigation/SessionExpiryViewModel`，在 `OpenListNavHost` 顶层按当前路由的 instanceId 复用 `AuthRepository.observeSession`（与管理台既有机制同源的 Room Flow 反应性），检测到会话消失即自动导航回登录页。**已验证**：3 个单测覆盖边沿检测逻辑（首次非空不触发、非空→空触发一次、重新登录后再次失效再触发一次）；真机冒烟测试确认编译通过、正常登录态导航无回归、无崩溃。**未验证**：真实"已登录态在前台被后端判定 401"的完整端到端复现——需要真实触发一次 401（例如改动真实管理员密码或直接改运行时 SQLite 库），前者风险超出本轮授权范围，后者在 Room WAL 模式下对存活进程做外部文件手术有数据损坏风险，均未在本轮执行；机制正确性由单测 + 与管理台既有已验证机制的代码同源性佐证。
+- **Token 失效自动跳转登录页（DEC-608，S6 修复）**：`SessionManager.invalidate()` 自 v0.2 起只删除本地 session 行、从不导航——`v0.2_ACCEPTANCE_REPORT.md` 曾将"Token 失效回登录页"标记为 Accepted，但实际只有管理台流程有自己的 `SESSION_EXPIRED` 跳转，主流程（文件/预览/上传等）401 后只显示内联错误条，用户此前只能靠"设置→实例管理→进入"手动回到登录页。v1.0 S6 已修复：新增 `app/navigation/SessionExpiryViewModel`，在 `OpenListNavHost` 顶层按当前路由的 instanceId 复用 `AuthRepository.observeSession`（与管理台既有机制同源的 Room Flow 反应性），检测到会话消失即自动导航回登录页。**已验证**：3 个单测覆盖边沿检测逻辑；真机冒烟测试确认无回归、无崩溃。**未验证**：真实"已登录态在前台被后端判定 401"的完整端到端复现——需要真实触发一次 401，触发方式的代价（改动真实账号密码 / 对存活进程运行时 SQLite 做外部文件手术）均超出本轮可接受范围，机制正确性由单测 + 与管理台既有已验证机制的代码同源性佐证。
 - **raw_url 端口环境问题（DEC-607 方案 B，S0 决议）**：历史观察到反代环境下 `fs/get` 返回的 `raw_url` 丢失端口，S0 用当前实例复测未复现（判断为服务端 `site_url` 已自行修正），App 不做静默端口重写，只保留 S1-T1 的裸错误响应识别（`HttpException` 分支）。若未来其他实例/本实例配置回退复现丢端口，需以真实证据重新开启该决策。
-- **HTTP 明文实例风险提示（PRD §13.2.5，S6-T4 新增）**：`AddInstanceScreen` 新增地址为 `http://` 时的醒目风险提示（登录凭据与文件内容不加密传输），真机验证：本地 HTTP mock 端点（`10.0.2.2`）经 AVD 明文连接成功、提示正确显示；`https://` 子路径地址（含尾部斜杠）保存后正确规范化去除尾部斜杠、保留子路径段，真机验证通过。
+- **HTTP 明文实例风险提示（PRD §13.2.5，S6-T4 新增）**：`AddInstanceScreen` 新增地址为 `http://` 时的醒目风险提示（登录凭据与文件内容不加密传输），真机验证：本地 HTTP mock 端点经 AVD 明文连接成功、提示正确显示；`https://` 子路径地址（含尾部斜杠）保存后正确规范化，真机验证通过。
+- **`SafeLogger` 脱敏漏洞（S7-T2 安全审计发现并修复）**：脱敏正则原先要求敏感 key 紧邻 `:`/`=` 分隔符，JSON 引号键形式（`"password":"value"`）完全不匹配——调试日志（`HttpLoggingInterceptor.Level.BODY`）打开时，OTP/密码等请求体可能明文落 logcat；`otp_code` 字段此前也完全不在脱敏关键字清单内。已修复（key 两侧允许标识符前后缀、值改为完整捕获），并修正了"`Authorization: Bearer <token>` 只脱敏 `Bearer` 一词、token 本身未脱敏"的历史脆弱点，补充单测。
+- **批量选择栏能力降级 UX 一致性（S7-T3 审计发现并修复，非安全漏洞）**：多选期间若目录写能力因新鲜数据到达从"乐观 true/unknown"降级为"确认 false"，批量操作按钮此前不会跟着失效（后端 403 仍是最终裁决，非安全绕过）；已修复为该场景自动退出多选。
+- **Room 8→9 真实升级路径已验证并关闭**（此前 v0.5 遗留的"未在真机验证"缺口）：v1.0 S6-T3 在隔离 AVD 会话中用 v0.4 可构建基线（提交 `7a7f175`，schema=8）全新安装并造真实数据，随后用 v1.0 APK 原地升级安装（非卸载重装）。结果：无崩溃，`PRAGMA user_version`=9，`admin_cache` 表正确创建且可读写，原 `instances`/`sessions`/`file_cache` 数据全部保留。`8.json` 的 `identityHash` 占位符因风险/收益不对称仍未修复（不影响本次验证结论）。
 
-## 本轮环境状态（比 v0.4 更强一档：本轮实际跑过构建）
+## 未在真机上验证的项目（发布前待验清单）
 
-v0.4 全程禁止运行任何构建/测试命令，一次编译都没有做过。**v0.5 本轮环境恢复了可运行 Gradle 的能力**：S0 起点即执行 `JAVA_HOME="C:/Program Files/Java/jdk-20" ./gradlew assembleDebug testDebugUnitTest` 确认 BUILD SUCCESSFUL，此后每个 Sprint 出口均以 `compileDebugKotlin`/`testDebugUnitTest` 实测通过为准（非纯静态审查），S8 版本号提升后（versionCode 4→5、versionName 0.4.0→0.5.0）重新跑过一次完整 `assembleDebug`/`testDebugUnitTest` 并确认 BUILD SUCCESSFUL。**但本轮仍然没有 Android 真机/模拟器**（`adb devices` 为空），因此"编译通过"与"真机运行正确"之间的 gap 仍然存在，性质与 v0.3 的验证口径相同（v0.4 是唯一连编译都没跑过的一轮）。
-
-## 未在真机上验证的项目（发布前待验清单，详见 `v0.5_ACCEPTANCE_REPORT.md`）
-
-- ~~**Room 8→9 真实升级路径**~~ —— **v1.0 S6-T3 已真机验证并关闭**：在隔离 AVD 会话中用 v0.4 完成点提交（7a7f175，schema=8）全新安装并造真实数据（实例+游客 session+4 层真实目录 `file_cache`），随后用 v1.0 debug APK 原地升级安装（非卸载重装）。结果：无崩溃，`PRAGMA user_version`=9，`admin_cache` 表按 v0.5 schema 正确创建（`id/instanceId/scope/cacheKey/rawJson/cachedAt` 六列）且可读写，原 `instances`/`sessions`（游客）/`file_cache`（5 行）数据全部保留，升级后应用正常导航、真实目录浏览无回归。`8.json` 的 `identityHash` 占位符 `PLACEHOLDER_UNVERIFIED_8_00000000000000` 因风险/收益不对称仍未修复（不影响本次验证结论，迁移路径走的是运行时 Room 迁移逻辑而非 schema JSON 比对）。
-- **`/@manage` 路径的真实可达性与页面渲染**：V-508 已从源码（`server/static/static.go:220`）确认路径本身存在，但未在真实部署的 OpenList 实例上实际打开验证。
+- **LDAP 登录、2FA/OTP 登录、三身份 `/api/me` 权限位对照的真机端到端演示**：需要 LDAP/2FA 已配置的测试账号，本轮未能取得，单测已覆盖代码路径正确性（S1）。
+- **成功解析已存在分享的完整展示（含目录/文件、有/无密码）**：需要具备 `CanShare` 权限的测试账号，本轮会话权限不足（S3 已验证权限拒绝路径本身正确）。
+- **API 29（Android 10）设备的真机验收**：本轮仅有 API 36 AVD，按 DEC-605 方案 B 记入 Parity Matrix 差异，不阻塞验收。
+- **`/@manage` 路径的真实可达性与页面渲染**：源码（`server/static/static.go:220`）+ 真实实例 `curl -I` 200 已确认部署可达，但未在真机浏览器实际渲染验证具体页面内容。
 - **外部浏览器 Intent 的真机弹出行为**：分享面板 vs 直接跳转，取决于设备默认浏览器配置，未真机验证。
-- **`AdminUserSummary.otpEnabled` 字段仍是 provisional**：`openlist-ref` 源码未找到可确认的 2FA 状态字段，S1~S7 全程保守显示为"未知"而非猜测 `false`，需要真实管理员账号（已开启/未开启 2FA 两种）核对后端实际返回。
-- **索引 `updateIndex` 的 `maxDepth=-1` 默认值**：是本轮基于 `internal/fs/walk.go` 递归终止条件（`depth==0` 停止）推导的"尽力而为"默认值，非确认的后端契约；真机验证后如发现后端对负数 `maxDepth` 有钳制或报错行为，需要调整。
-- **设置分组的 12 个 Group 枚举中文命名**是否与真实后端返回的常见配置项分布相符（例如"其他"兜底分支覆盖率），未用真实实例核对。
-- **深色模式**：管理台新组件（`AdminScaffold`/`AdminTabRow`/`IndexProgressPanel`/`AdminUserDetailSheet`/`AdminStorageDetailSheet` 等）复用既有 designsystem token，但未做系统性人工暗色走查。
-- **存储 `status` 字段的健康判定阈值**（"work"字符串、大小写不敏感）为 S3 保守推导，真机验证后如与实际驱动行为不符需要校准（详见 `v0.5_IMPLEMENTATION_LOG.md` S3 决策记录第 4 条）。
-- 沿用 v0.4 已知的：Media3/ExoPlayer 实际播放效果、Markdown 渲染排版、图片预览/Coil 缓存等——均未在本轮重新验证（v0.5 未改动这些既有功能）。
+- **`AdminUserSummary.otpEnabled` 字段仍是 provisional**：`openlist-ref` 源码未找到可确认的 2FA 状态字段，保守显示为"未知"而非猜测 `false`，需要真实管理员账号（已开启/未开启 2FA 两种）核对后端实际返回。
+- **索引 `updateIndex` 的 `maxDepth=-1` 默认值**：V-609 已从源码（`internal/fs/walk.go`）确认 `-1` 是可靠的"事实无限递归"，非猜测；但实际索引结果与显式大值（如 20/100）的最终对比仍未做过。
+- **设置分组的 12 个 Group 枚举中文命名**是否与真实后端返回的常见配置项分布相符，未用真实实例核对。
+- **存储 `status` 字段的健康判定阈值**（"work"字符串、大小写不敏感）为 v0.5 保守推导，真机验证后如与实际驱动行为不符需要校准。
+- **`PreviewRepository.refreshPreviewUrl`**：v0.4 遗留的死桩方法（恒定失败、零调用方），S6 静态审计确认不影响任何真实功能路径（媒体播放的实际刷新机制在别处正常工作），本轮未清理，留待后续版本做死代码清理。
 
-建议在自建 OpenList 实例 + 真机/模拟器上完整走一遍 `v0.5_EXECUTION_PLAN.md` §14 验收清单再发布，重点覆盖上述"真机项"与 Room 8→9 真实升级路径。
+## 一般性观察（非 v1.0 引入的缺口，项目级别）
 
-## 一般性观察（非 v0.5 引入的缺口，项目级别）
-
-- **项目全局没有配置 `HttpLoggingInterceptor`**：S8 安全审计确认这不是 v0.5 引入的新问题，而是自 v0.1 起就没有的组件（沿用既有的最小化日志面），一并记录供后续版本评估是否需要引入（引入时需同步设计 admin 接口响应体的脱敏策略）。
-
-## v1.0 Parity Matrix 预留材料（PRD §18.1，6 项，供 v1.0 建立完整 Parity Matrix 时直接引用）
-
-1. **用户管理**：v0.5 原生只读（列表+详情），Web 管理台支持完整 CRUD（创建/编辑/删除用户、重置密码、取消 2FA、SSH Key 管理）。
-2. **存储管理**：v0.5 原生只做查看、启用、禁用、重新加载全部，Web 管理台支持完整创建/编辑/删除存储与动态驱动配置表单。
-3. **设置管理**：v0.5 原生只读（含默认设置对比），Web 管理台支持保存、删除设置项、重置 API Token、各类下载工具账号配置表单。
-4. **任务管理**：v0.5 原生覆盖 7 类任务的常用动作（取消/重试/删除记录），不做批量清理接口（`cancel_some`/`delete_some`/`retry_some`/`clear_done`/`clear_succeeded`/`retry_failed`）、完整日志详情、速度曲线。
-5. **索引管理**：v0.5 原生覆盖构建/更新/停止/清空常用动作，但路径更新细节（如 `maxDepth` 语义、多路径选择器）可能与 Web 端实际行为存在差异，`maxDepth=-1` 默认值为客户端最佳努力推导，非确认契约。
-6. **Web 兜底**：不注入原生 App 的 Token/Cookie（原生会话与 Web 会话完全独立），打开 `/@manage` 后可能需要用户在 Web 端重新登录。
+- **项目全局没有配置 `HttpLoggingInterceptor`**：非 v1.0/v0.5 引入的新问题，自 v0.1 起就没有的组件（沿用既有的最小化日志面），一并记录供后续版本评估是否需要引入（引入时需同步设计 admin 接口响应体的脱敏策略）。
+- **分享入站不支持完整分享态目录浏览**：v1.0_PRD §3 明确的范围裁剪，入站最小闭环止于"解析 → 展示分享基础信息 → 单文件预览/外部打开分发 → 复制/浏览器兜底"；`/@s/` 前缀下的多级目录递归浏览记 Deferred，见 Parity Matrix "分享"域。
 
 ---
+
+## v0.5.0（历史）
+
+- 本轮环境相比 v0.4 恢复了可运行 Gradle 的能力：`assembleDebug`/`testDebugUnitTest` 全程实测通过，但仍无 Android 真机/模拟器（`adb devices` 为空），"编译通过"与"真机运行正确"之间的 gap 依然存在；v1.0 起该 gap 已随可用 AVD 的出现而关闭。
+- Room 8→9 真实升级路径、`/@manage` 真实可达性、外部浏览器弹出行为、`otpEnabled` 字段、`maxDepth=-1` 默认值、设置分组命名、深色模式系统走查、存储 `status` 阈值——均因无真机环境未验证；v1.0 已验证并关闭其中 Room 8→9 升级路径与深色模式走查（部分页面），其余延续为 v1.0 已知限制（见上）。
+- Parity Matrix 预留材料（PRD §18.1，6 项，v1.0 建立 `Parity_Matrix.md` 时已直接采纳并逐项归档，此处保留历史记录）：(1) 用户管理只读，Web 支持完整 CRUD；(2) 存储管理只做查看/启停/重载全部，Web 支持完整创建/编辑/删除与动态驱动配置；(3) 设置管理只读，Web 支持保存/删除/重置 Token；(4) 任务管理覆盖常用动作，不做批量清理接口；(5) 索引管理覆盖常用动作，`maxDepth=-1` 为客户端推导非确认契约；(6) Web 兜底不注入原生 Token/Cookie。
+- 项目全局没有配置 `HttpLoggingInterceptor`——S8 安全审计确认非 v0.5 引入的新问题，自 v0.1 起就没有的组件。
 
 ## v0.4 待真机核对的后端行为推测（V-401 ~ V-410，历史遗留，v0.5 未重新核实）
 
