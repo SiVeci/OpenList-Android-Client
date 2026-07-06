@@ -72,6 +72,12 @@ import io.openlist.client.core.model.MarkdownPreviewContent
  *    fails to load through the default handler (no scheme match), which
  *    degrades to "no image, text continues" — satisfying "失败不阻断正文渲染"
  *    without needing a custom placeholder/error `Drawable` API.
+ *    Note (S7-T3 audit): unlike [io.openlist.client.feature.preview
+ *    .ImagePreviewSurface]'s full-screen image preview, these embedded
+ *    images are loaded through Markwon's own `NetworkSchemeHandler`, not
+ *    Coil — there is no disk/memory cache and therefore no `instanceId`-scoped
+ *    cache key to worry about here; do not assume these are Coil-cached if
+ *    refactoring this later.
  *
  * Rendering itself (`markwon.setMarkdown`) is wrapped in `runCatching`
  * (§14.3): a parser/render exception falls back to showing the raw Markdown

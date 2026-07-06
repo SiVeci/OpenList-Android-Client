@@ -174,6 +174,15 @@ class FileListViewModel @Inject constructor(
                         it.copy(nodes = result.nodes, fromCache = true, isLoading = false, directoryCapability = result.capability)
                     }
                     is FileListResult.Fresh -> _uiState.update {
+                        // S7-T3 audit: a fresh fetch can downgrade the
+                        // directory's write capability from optimistic
+                        // true/unknown to confirmed false (e.g. permissions
+                        // changed server-side between page loads). The batch
+                        // selection bar's actions aren't independently gated,
+                        // so an active selection must be dropped here rather
+                        // than left visible/tappable against stale capability.
+                        val revokedWrite = it.selectionMode && it.directoryCapability.canWrite != false &&
+                            result.capability.canWrite == false
                         it.copy(
                             nodes = result.nodes,
                             fromCache = false,
@@ -181,6 +190,8 @@ class FileListViewModel @Inject constructor(
                             isRefreshing = false,
                             errorMessage = null,
                             directoryCapability = result.capability,
+                            selectionMode = if (revokedWrite) false else it.selectionMode,
+                            selectedPaths = if (revokedWrite) emptySet() else it.selectedPaths,
                         )
                     }
                     is FileListResult.Error -> _uiState.update {
