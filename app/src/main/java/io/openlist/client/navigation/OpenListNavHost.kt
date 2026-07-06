@@ -1,9 +1,13 @@
 package io.openlist.client.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import io.openlist.client.feature.admin.AdminHostScreen
 import io.openlist.client.feature.auth.LoginScreen
@@ -22,6 +26,25 @@ import io.openlist.client.feature.task.TaskCenterScreen
 
 @Composable
 fun OpenListNavHost(navController: NavHostController = rememberNavController()) {
+    // v1.0 S6 fix: generalizes the admin console's own session-expiry
+    // redirect (see AdminHostScreen's onSessionExpired) to every screen. Keyed
+    // on the *currently displayed* instanceId (from the top back-stack
+    // entry's nav args) so switching instances or landing on an
+    // instance-agnostic route (Settings, Instance List) restarts/suspends the
+    // watch accordingly; see SessionExpiryViewModel's KDoc for why this can't
+    // double-fire while already on Login.
+    val sessionExpiryViewModel: SessionExpiryViewModel = hiltViewModel()
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentInstanceId = currentBackStackEntry?.arguments?.getString("instanceId")
+    LaunchedEffect(currentInstanceId) {
+        if (currentInstanceId == null) return@LaunchedEffect
+        sessionExpiryViewModel.observeExpiry(currentInstanceId).collect {
+            if (navController.currentBackStackEntry?.destination?.route != Routes.LOGIN) {
+                navController.navigate(Routes.login(currentInstanceId)) { popUpTo(0) }
+            }
+        }
+    }
+
     NavHost(navController = navController, startDestination = Routes.SPLASH) {
         composable(Routes.SPLASH) {
             SplashScreen(onNavigate = { route, popSplash ->

@@ -2,6 +2,10 @@
 
 v0.1~v0.4 的已知限制见文末历史章节。以下是 v0.5 范围内已知的限制。
 
+## v1.0 进行中记录（S0~S7 陆续更新，S8 定稿前的中间态，本节届时会并入正式发布说明）
+
+- **Token 失效自动跳转登录页（DEC-608，S6 修复）**：`SessionManager.invalidate()` 自 v0.2 起只删除本地 session 行、从不导航——`v0.2_ACCEPTANCE_REPORT.md` 曾将"Token 失效回登录页"标记为 Accepted，但实际只有管理台流程有自己的 `SESSION_EXPIRED` 跳转，主流程（文件/预览/上传等）401 后只显示内联错误条，用户此前只能靠"设置→实例管理→进入"手动回到登录页。v1.0 S6 已修复：新增 `app/navigation/SessionExpiryViewModel`，在 `OpenListNavHost` 顶层按当前路由的 instanceId 复用 `AuthRepository.observeSession`（与管理台既有机制同源的 Room Flow 反应性），检测到会话消失即自动导航回登录页。**已验证**：3 个单测覆盖边沿检测逻辑（首次非空不触发、非空→空触发一次、重新登录后再次失效再触发一次）；真机冒烟测试确认编译通过、正常登录态导航无回归、无崩溃。**未验证**：真实"已登录态在前台被后端判定 401"的完整端到端复现——需要真实触发一次 401（例如改动真实管理员密码或直接改运行时 SQLite 库），前者风险超出本轮授权范围，后者在 Room WAL 模式下对存活进程做外部文件手术有数据损坏风险，均未在本轮执行；机制正确性由单测 + 与管理台既有已验证机制的代码同源性佐证。
+
 ## 本轮环境状态（比 v0.4 更强一档：本轮实际跑过构建）
 
 v0.4 全程禁止运行任何构建/测试命令，一次编译都没有做过。**v0.5 本轮环境恢复了可运行 Gradle 的能力**：S0 起点即执行 `JAVA_HOME="C:/Program Files/Java/jdk-20" ./gradlew assembleDebug testDebugUnitTest` 确认 BUILD SUCCESSFUL，此后每个 Sprint 出口均以 `compileDebugKotlin`/`testDebugUnitTest` 实测通过为准（非纯静态审查），S8 版本号提升后（versionCode 4→5、versionName 0.4.0→0.5.0）重新跑过一次完整 `assembleDebug`/`testDebugUnitTest` 并确认 BUILD SUCCESSFUL。**但本轮仍然没有 Android 真机/模拟器**（`adb devices` 为空），因此"编译通过"与"真机运行正确"之间的 gap 仍然存在，性质与 v0.3 的验证口径相同（v0.4 是唯一连编译都没跑过的一轮）。

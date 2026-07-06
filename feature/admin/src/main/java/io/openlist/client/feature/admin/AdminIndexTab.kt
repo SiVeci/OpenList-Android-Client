@@ -40,9 +40,9 @@ import io.openlist.client.core.designsystem.components.LoadingState
  * the danger style (PRD §8.5/§15.2 "清空索引...应使用危险操作样式" -- the
  * *only* index operation called out for danger styling; build/update/stop
  * stay normal-style, mirroring [AdminStorageTab]'s enable/reload-all vs.
- * disable precedent). No directory-picker for "更新索引" -- DEC-504 defaults
- * cover the only path v0.5 needs (`/`), the picker itself being the PRD's
- * explicitly-optional "时间允许再做" enhancement.
+ * disable precedent). "更新索引" now has a directory picker (v1.0 S5-T1,
+ * [AdminUpdatePathRow]/[AdminIndexListViewModel.openPathPicker]), defaulting
+ * to DEC-504's `/` for the common case.
  *
  * Polling (S6-T3): started in [DisposableEffect]/stopped `onDispose`, keyed on
  * `instanceId`, independent of [AdminTaskTab]'s own polling lifecycle
