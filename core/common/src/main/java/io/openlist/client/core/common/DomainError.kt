@@ -47,6 +47,12 @@ sealed class DomainError {
      * `otpCode` was sent, mapping a resubmission failure to this case
      * instead of re-issuing a "needs OTP" prompt). */
     data object OtpInvalid : DomainError()
+    /** An upload task can't be retried: not in a retryable (FAILED) state, or
+     * its SAF `content://` grant is no longer readable — v1.0_PRD §12.1. */
+    data object UploadRetryUnavailable : DomainError()
+    /** A local download task can't be cancelled: not in a cancellable
+     * (ENQUEUED/RUNNING) state — v1.0_PRD §12.1. */
+    data object DownloadCancelUnavailable : DomainError()
     data class OpenListError(val code: Int?, val message: String) : DomainError()
     data class Unknown(val throwable: Throwable?) : DomainError()
 }
@@ -74,6 +80,8 @@ fun DomainError.toUserMessage(): String = when (this) {
     DomainError.AdminApiUnavailable -> "当前实例不支持该管理能力"
     DomainError.AuthMethodUnavailable -> "该实例未启用此登录方式，或当前账号不允许使用"
     DomainError.OtpInvalid -> "两步验证码错误或已过期，请重新输入"
+    DomainError.UploadRetryUnavailable -> "该任务当前无法重试，文件可能已不可访问，请重新选择上传"
+    DomainError.DownloadCancelUnavailable -> "该任务当前无法取消"
     is DomainError.OpenListError -> message.ifBlank { "请求失败${code?.let { " ($it)" } ?: ""}" }
     is DomainError.Unknown -> "出现未知错误，请重试"
 }

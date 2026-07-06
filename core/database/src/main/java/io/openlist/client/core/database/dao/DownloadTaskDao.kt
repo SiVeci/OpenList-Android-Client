@@ -12,6 +12,9 @@ interface DownloadTaskDao {
     @Query("SELECT * FROM download_tasks WHERE instanceId = :instanceId ORDER BY createdAt DESC")
     fun observeByInstance(instanceId: String): Flow<List<DownloadTaskEntity>>
 
+    @Query("SELECT * FROM download_tasks WHERE id = :id")
+    suspend fun getById(id: String): DownloadTaskEntity?
+
     /** Rows DownloadManager might still be working on — P9's status-refresh
      * only needs to query these, never the ones already at a terminal status. */
     @Query("SELECT * FROM download_tasks WHERE instanceId = :instanceId AND status NOT IN ('SUCCESS', 'FAILED', 'CANCELLED')")

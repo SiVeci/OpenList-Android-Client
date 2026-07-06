@@ -54,7 +54,7 @@ class TaskAggregationRepositoryImpl @Inject constructor(
 
     override suspend fun cancelTask(instanceId: String, taskId: String, source: TaskSource): ApiResult<Unit> = when (source) {
         TaskSource.LOCAL_UPLOAD -> uploadRepository.cancelUpload(taskId)
-        TaskSource.LOCAL_DOWNLOAD -> ApiResult.Failure(DomainError.OpenListError(code = null, message = "暂不支持取消下载任务"))
+        TaskSource.LOCAL_DOWNLOAD -> transferRepository.cancelDownload(taskId)
         TaskSource.REMOTE -> {
             val cached = remoteTaskDao.getById(taskId, instanceId)
             if (cached == null) {
@@ -63,6 +63,12 @@ class TaskAggregationRepositoryImpl @Inject constructor(
                 taskRepository.cancelRemoteTask(instanceId, cached.taskType, taskId)
             }
         }
+    }
+
+    override suspend fun retryTask(instanceId: String, taskId: String, source: TaskSource): ApiResult<Unit> = when (source) {
+        TaskSource.LOCAL_UPLOAD -> uploadRepository.retryUpload(taskId)
+        TaskSource.LOCAL_DOWNLOAD -> ApiResult.Failure(DomainError.OpenListError(code = null, message = "暂不支持重试下载任务"))
+        TaskSource.REMOTE -> ApiResult.Failure(DomainError.OpenListError(code = null, message = "暂不支持重试远程任务"))
     }
 
     private fun UnifiedTaskStatus.sortRank(): Int = when (this) {

@@ -20,4 +20,15 @@ interface TransferRepository {
      * local record — the task center's poll/pull-to-refresh entry point,
      * not a background service (no always-on polling, §20). */
     suspend fun refreshDownloadStatus(instanceId: String)
+
+    /**
+     * Cancels a local download from the task center (v1.0_PRD §4.2.C.2).
+     * `DownloadManager.remove` is idempotent (v1.0_EXECUTION_PLAN.md V-606:
+     * a no-longer-existent id is simply a no-op, never throws), so this always
+     * proceeds to mark the local row CANCELLED once the task is in a
+     * cancellable state. Fails with
+     * [io.openlist.client.core.common.DomainError.DownloadCancelUnavailable]
+     * if the task is already terminal (SUCCESS/FAILED/CANCELLED).
+     */
+    suspend fun cancelDownload(taskId: String): ApiResult<Unit>
 }

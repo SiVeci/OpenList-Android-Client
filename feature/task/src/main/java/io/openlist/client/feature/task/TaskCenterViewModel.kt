@@ -148,6 +148,19 @@ class TaskCenterViewModel @Inject constructor(
         _uiState.update { it.copy(snackbarMessage = null) }
     }
 
+    // --- Retry (v1.0_PRD §4.2.C.1) --------------------------------------------
+
+    /** No confirmation dialog — unlike cancel, retrying is low-risk/reversible
+     * (worst case it fails again with the same reason shown). */
+    fun retryTask(task: UnifiedTask) {
+        viewModelScope.launch {
+            when (val result = taskAggregationRepository.retryTask(instanceId, task.id, task.source)) {
+                is ApiResult.Success -> _uiState.update { it.copy(snackbarMessage = "已重新开始上传") }
+                is ApiResult.Failure -> _uiState.update { it.copy(snackbarMessage = result.error.toUserMessage()) }
+            }
+        }
+    }
+
     // --- Open target (S6-T4, P-407) --------------------------------------------
 
     /**

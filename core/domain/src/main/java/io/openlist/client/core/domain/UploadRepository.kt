@@ -18,4 +18,14 @@ interface UploadRepository {
     fun observeUploadTasks(instanceId: String): Flow<List<UploadTask>>
 
     suspend fun cancelUpload(taskId: String): ApiResult<Unit>
+
+    /**
+     * Re-enqueues a FAILED upload from the beginning (v1.0_PRD §4.2.C.1). No
+     * byte-range resume — [UploadWorker] always restarts `uploadedBytes` at 0
+     * regardless, so retry mirrors that. Fails with
+     * [io.openlist.client.core.common.DomainError.UploadRetryUnavailable] if
+     * the task isn't FAILED, or its SAF grant can no longer be opened
+     * (v1.0_EXECUTION_PLAN.md V-605).
+     */
+    suspend fun retryUpload(taskId: String): ApiResult<Unit>
 }

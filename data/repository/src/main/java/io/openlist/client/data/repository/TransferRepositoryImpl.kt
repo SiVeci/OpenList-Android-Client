@@ -85,6 +85,19 @@ class TransferRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun cancelDownload(taskId: String): ApiResult<Unit> {
+        val task = downloadTaskDao.getById(taskId) ?: return ApiResult.Failure(DomainError.NotFound)
+        if (task.status != DownloadTaskStatus.ENQUEUED && task.status != DownloadTaskStatus.RUNNING) {
+            return ApiResult.Failure(DomainError.DownloadCancelUnavailable)
+        }
+        task.downloadManagerId?.let { managerId ->
+            val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            downloadManager.remove(managerId)
+        }
+        downloadTaskDao.updateStatus(taskId, DownloadTaskStatus.CANCELLED, task.progress, null, null, System.currentTimeMillis())
+        return ApiResult.Success(Unit)
+    }
+
     private data class CursorStatus(val status: String, val progress: Int?, val errorMessage: String?, val localUri: String?)
 
     private fun Cursor.toStatus(): CursorStatus {

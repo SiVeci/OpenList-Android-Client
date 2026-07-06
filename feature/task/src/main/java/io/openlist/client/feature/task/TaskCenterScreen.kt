@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FileCopy
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Task
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -133,6 +134,7 @@ fun TaskCenterScreen(
                             TaskRow(
                                 task = task,
                                 onCancel = { viewModel.openCancelConfirm(task) },
+                                onRetry = { viewModel.retryTask(task) },
                                 onOpenTarget = { viewModel.openTaskTarget(task, onOpenDirectory, onOpenFile) },
                             )
                         }
@@ -188,11 +190,17 @@ fun TaskCenterScreen(
 private fun TaskRow(
     task: UnifiedTask,
     onCancel: () -> Unit,
+    onRetry: () -> Unit,
     onOpenTarget: () -> Unit,
 ) {
     val cardStatus = task.status.toCardStatus()
-    val canCancel = (task.status == UnifiedTaskStatus.RUNNING || task.status == UnifiedTaskStatus.PENDING) &&
-        task.source != io.openlist.client.core.model.TaskSource.LOCAL_DOWNLOAD
+    // v1.0: local downloads can now be cancelled too (v1.0_PRD §4.2.C.2) —
+    // the LOCAL_DOWNLOAD exclusion that existed before TransferRepository had
+    // a cancelDownload method is gone.
+    val canCancel = task.status == UnifiedTaskStatus.RUNNING || task.status == UnifiedTaskStatus.PENDING
+    // v1.0_PRD §4.2.C.1: only local uploads support retry.
+    val canRetry = task.status == UnifiedTaskStatus.FAILED &&
+        task.source == io.openlist.client.core.model.TaskSource.LOCAL_UPLOAD
     // Unchanged condition (S6-T4 DoD: "canOpenFolder"'s own gating logic is
     // not touched, only what a click on it does) -- still gates on
     // SUCCESS+non-null path; the icon's name/"跳转目录" label stays even
@@ -213,6 +221,11 @@ private fun TaskRow(
             if (canOpenFolder) {
                 IconButton(onClick = onOpenTarget) {
                     Icon(Icons.Filled.FolderOpen, contentDescription = "跳转目录")
+                }
+            }
+            if (canRetry) {
+                IconButton(onClick = onRetry) {
+                    Icon(Icons.Filled.Refresh, contentDescription = "重试")
                 }
             }
             if (canCancel) {

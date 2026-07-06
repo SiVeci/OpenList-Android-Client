@@ -81,6 +81,26 @@ class UploadRepositoryImpl @Inject constructor(
         return ApiResult.Success(Unit)
     }
 
+    override suspend fun retryUpload(taskId: String): ApiResult<Unit> {
+        val task = uploadTaskDao.getById(taskId) ?: return ApiResult.Failure(DomainError.NotFound)
+        if (task.status != UploadTaskStatus.FAILED) return ApiResult.Failure(DomainError.UploadRetryUnavailable)
+        val readable = runCatching {
+            context.contentResolver.openInputStream(Uri.parse(task.localUri))?.use { }
+        }.isSuccess
+        if (!readable) return ApiResult.Failure(DomainError.UploadRetryUnavailable)
+
+        val now = System.currentTimeMillis()
+        uploadTaskDao.updateProgress(taskId, UploadTaskStatus.PENDING, 0L, null, now)
+        val request = OneTimeWorkRequestBuilder<UploadWorker>()
+            .setInputData(workDataOf(UploadWorker.KEY_TASK_ID to taskId))
+            .build()
+        // REPLACE, not KEEP: the previous attempt's unique work is already
+        // terminal (FAILED), so there's nothing to preserve by keeping it.
+        workManager.enqueueUniqueWork(uniqueWorkName(taskId), ExistingWorkPolicy.REPLACE, request)
+        uploadTaskDao.setWorkRequestId(taskId, request.id.toString())
+        return ApiResult.Success(Unit)
+    }
+
     private fun queryMetadata(uri: Uri): Triple<String?, Long?, String?> {
         var displayName: String? = null
         var size: Long? = null

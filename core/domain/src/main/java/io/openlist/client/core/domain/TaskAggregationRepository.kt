@@ -20,7 +20,15 @@ interface TaskAggregationRepository {
     suspend fun refreshDownloadStatuses(instanceId: String)
 
     /** Dispatches by [source]: LOCAL_UPLOAD → UploadRepository.cancelUpload,
-     * REMOTE → TaskRepository.cancelRemoteTask. LOCAL_DOWNLOAD cancellation
-     * is not supported in v0.3 (§16.3). */
+     * LOCAL_DOWNLOAD → TransferRepository.cancelDownload (v1.0_PRD §4.2.C.2),
+     * REMOTE → TaskRepository.cancelRemoteTask. */
     suspend fun cancelTask(instanceId: String, taskId: String, source: TaskSource): ApiResult<Unit>
+
+    /**
+     * Dispatches a retry by [source] (v1.0_PRD §4.2.C.1). Only LOCAL_UPLOAD is
+     * supported in v1.0 — REMOTE and LOCAL_DOWNLOAD return an explicit
+     * unsupported error rather than silently doing nothing, matching how
+     * [cancelTask]'s LOCAL_DOWNLOAD branch was handled before v1.0.
+     */
+    suspend fun retryTask(instanceId: String, taskId: String, source: TaskSource): ApiResult<Unit>
 }
