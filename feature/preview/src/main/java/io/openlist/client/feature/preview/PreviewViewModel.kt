@@ -128,7 +128,16 @@ class PreviewViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(markdownBodyState = PreviewBodyState.Loading) }
             val result = previewRepository.loadMarkdown(instanceId, path, forceRefresh)
-            _uiState.update { it.copy(markdownBodyState = result.toBodyState()) }
+            // v1.0 S4: rewrite embedded image refs to their resolved signed
+            // URLs before the body ever reaches the renderer — a failure here
+            // is impossible by construction (resolveMarkdownImages never
+            // throws, unresolvable refs are just left as-is), so this never
+            // needs its own error branch.
+            val withImages = when (result) {
+                is ApiResult.Success -> ApiResult.Success(previewRepository.resolveMarkdownImages(instanceId, result.data))
+                is ApiResult.Failure -> result
+            }
+            _uiState.update { it.copy(markdownBodyState = withImages.toBodyState()) }
         }
     }
 

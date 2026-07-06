@@ -19,6 +19,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.viewinterop.AndroidView
 import io.noties.markwon.Markwon
+import io.noties.markwon.image.ImagesPlugin
+import io.noties.markwon.image.data.DataUriSchemeHandler
+import io.noties.markwon.image.network.NetworkSchemeHandler
 import io.openlist.client.core.designsystem.Spacing
 import io.openlist.client.core.model.MarkdownPreviewContent
 
@@ -51,15 +54,24 @@ import io.openlist.client.core.model.MarkdownPreviewContent
  *    browser/handler) and the "must not crash on an unhandled scheme"
  *    requirement are both satisfied by Markwon's own default — no custom
  *    `LinkResolver` needed here.
- * 3. **Images**: not implemented this Sprint. Rendering embedded images
- *    would need the `markwon-image` artifact (not currently a project
- *    dependency) plus a hand-written Coil-backed `AsyncDrawableLoader`/
- *    `SchemeHandler` — a real implementation surface that can't be verified
- *    without compiling, on top of the basePath-relative-URL resolution
- *    already being sign-less or best-effort (V-409). Skipped as a deliberate
- *    scope cut; markdown documents with embedded images still render their
- *    text content correctly, just without inline images. Left for a later
- *    version.
+ * 3. **Images** (v1.0 S4, DEC-606): `ImagesPlugin.create()` ships with *no*
+ *    scheme handlers registered (verified against the 4.6.2 class files —
+ *    `ImagesPlugin.create()` takes zero arguments and adds none by default);
+ *    this explicitly registers only `NetworkSchemeHandler` (http/https) and
+ *    `DataUriSchemeHandler` (`data:`) — deliberately no `FileSchemeHandler`,
+ *    so this can never be pointed at an on-device file path. No custom
+ *    loader class needed beyond that, because the actual "restricted" part of
+ *    DEC-606 happens one layer down, in [io.openlist.client.data.repository
+ *    .PreviewRepositoryImpl.resolveMarkdownImages]: every relative image
+ *    reference in the raw markdown is rewritten to its resolved signed URL
+ *    *before* this Composable ever sees it (via the normal unauthenticated
+ *    `fs/get` mechanism, V-608), and external URLs are never touched. Neither
+ *    this Composable nor `ImagesPlugin`'s default network handler ever
+ *    attaches an `Authorization` header to anything — that's a structural
+ *    property, not a runtime check. An unresolvable/still-relative ref simply
+ *    fails to load through the default handler (no scheme match), which
+ *    degrades to "no image, text continues" — satisfying "失败不阻断正文渲染"
+ *    without needing a custom placeholder/error `Drawable` API.
  *
  * Rendering itself (`markwon.setMarkdown`) is wrapped in `runCatching`
  * (§14.3): a parser/render exception falls back to showing the raw Markdown
@@ -72,7 +84,17 @@ fun MarkdownPreviewSurface(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val markwon = remember(context) { Markwon.create(context) }
+    val markwon = remember(context) {
+        Markwon.builder(context)
+            .usePlugin(
+                ImagesPlugin.create()
+                    // Only http(s) and data: — no `file`/content-resolver scheme
+                    // handler, so this can never be pointed at on-device files.
+                    .addSchemeHandler(NetworkSchemeHandler.create())
+                    .addSchemeHandler(DataUriSchemeHandler.create()),
+            )
+            .build()
+    }
     val density = LocalDensity.current
     val paddingPx = remember(density) { with(density) { Spacing.md.roundToPx() } }
 
@@ -80,6 +102,12 @@ fun MarkdownPreviewSurface(
         if (content.isTruncated) {
             TruncatedNotice(
                 message = "仅显示前 512KB 内容，下载查看完整文件",
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        if (MARKDOWN_IMAGE_MARKER.containsMatchIn(content.rawMarkdown)) {
+            TruncatedNotice(
+                message = "文中图片：同实例图片已用当前会话权限加载；外部图片不会携带登录凭据",
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -115,3 +143,8 @@ fun MarkdownPreviewSurface(
         }
     }
 }
+
+/** Cheap presence check for the one-time image-safety notice — doesn't need
+ * to be the same precise pattern as the repository's rewrite regex, a false
+ * positive here just shows a harmless notice on a document with no images. */
+private val MARKDOWN_IMAGE_MARKER = Regex("""!\[[^\]]*]\(""")

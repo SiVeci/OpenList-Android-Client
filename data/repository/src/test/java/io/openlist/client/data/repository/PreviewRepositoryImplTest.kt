@@ -10,8 +10,12 @@ import io.openlist.client.core.common.DispatcherProvider
 import io.openlist.client.core.common.DomainError
 import io.openlist.client.core.database.dao.PreviewCacheDao
 import io.openlist.client.core.database.entity.PreviewCacheEntity
+import io.openlist.client.core.domain.FilesRepository
 import io.openlist.client.core.domain.InstanceRepository
+import io.openlist.client.core.model.FileDetail
 import io.openlist.client.core.model.Instance
+import io.openlist.client.core.model.MarkdownImageSource
+import io.openlist.client.core.model.MarkdownPreviewContent
 import io.openlist.client.core.model.PreviewFallback
 import io.openlist.client.core.model.PreviewKind
 import io.openlist.client.core.model.PreviewOpenMode
@@ -57,6 +61,7 @@ class PreviewRepositoryImplTest {
     private val clientFactory = mockk<OpenListClientFactory>()
     private val sessionManager = mockk<SessionManager>(relaxed = true)
     private val previewCacheDao = mockk<PreviewCacheDao>(relaxed = true)
+    private val filesRepository = mockk<FilesRepository>()
     private val previewHttpClient = PreviewHttpClient()
     private val dispatcherProvider = object : DispatcherProvider {
         override val io: CoroutineDispatcher = Dispatchers.Unconfined
@@ -95,6 +100,7 @@ class PreviewRepositoryImplTest {
             dispatcherProvider = dispatcherProvider,
             json = json,
             context = context,
+            filesRepository = filesRepository,
         )
     }
 
@@ -396,6 +402,91 @@ class PreviewRepositoryImplTest {
     private fun success(data: FsGetResp) = ApiResponse(code = 200, message = "success", data = data)
 
     private fun failure(code: Int, message: String) = ApiResponse<FsGetResp>(code = code, message = message, data = null)
+
+    // --- resolveMarkdownImage / resolveMarkdownImages (v1.0 S4) --------------
+
+    @Test
+    fun `an absolute https image ref resolves to External untouched`() = runTest {
+        val result = repository.resolveMarkdownImage(INSTANCE_ID, "/docs", "https://cdn.example.com/a.png")
+
+        assertEquals(MarkdownImageSource.External("https://cdn.example.com/a.png"), result)
+    }
+
+    @Test
+    fun `a data URI resolves to External untouched`() = runTest {
+        val result = repository.resolveMarkdownImage(INSTANCE_ID, "/docs", "data:image/png;base64,abc")
+
+        assertEquals(MarkdownImageSource.External("data:image/png;base64,abc"), result)
+    }
+
+    @Test
+    fun `a same-directory relative ref resolves against basePath and returns the signed raw_url`() = runTest {
+        coEvery { filesRepository.getFile(INSTANCE_ID, "/docs/images/a.png") } returns
+            ApiResult.Success(fileDetail(path = "/docs/images/a.png", rawUrl = "https://example.com/p/docs/images/a.png?sign=x"))
+
+        val result = repository.resolveMarkdownImage(INSTANCE_ID, "/docs", "images/a.png")
+
+        assertEquals(MarkdownImageSource.Internal("https://example.com/p/docs/images/a.png?sign=x"), result)
+    }
+
+    @Test
+    fun `a parent-relative ref (dot dot) collapses correctly`() = runTest {
+        coEvery { filesRepository.getFile(INSTANCE_ID, "/assets/a.png") } returns
+            ApiResult.Success(fileDetail(path = "/assets/a.png", rawUrl = "https://example.com/p/assets/a.png?sign=y"))
+
+        val result = repository.resolveMarkdownImage(INSTANCE_ID, "/docs/sub", "../../assets/a.png")
+
+        assertEquals(MarkdownImageSource.Internal("https://example.com/p/assets/a.png?sign=y"), result)
+    }
+
+    @Test
+    fun `a relative ref the current session cannot read resolves to Unresolvable, not a crash`() = runTest {
+        coEvery { filesRepository.getFile(INSTANCE_ID, "/docs/missing.png") } returns ApiResult.Failure(DomainError.NotFound)
+
+        val result = repository.resolveMarkdownImage(INSTANCE_ID, "/docs", "missing.png")
+
+        assertEquals(MarkdownImageSource.Unresolvable, result)
+    }
+
+    @Test
+    fun `resolveMarkdownImages rewrites only the resolvable relative reference`() = runTest {
+        coEvery { filesRepository.getFile(INSTANCE_ID, "/docs/a.png") } returns
+            ApiResult.Success(fileDetail(path = "/docs/a.png", rawUrl = "https://example.com/p/docs/a.png?sign=z"))
+        coEvery { filesRepository.getFile(INSTANCE_ID, "/docs/missing.png") } returns ApiResult.Failure(DomainError.NotFound)
+        val content = MarkdownPreviewContent(
+            path = "/docs/readme.md",
+            rawMarkdown = "# Title\n![local](a.png)\n![gone](missing.png)\n![external](https://cdn.example.com/b.png)\n",
+            basePath = "/docs",
+            isTruncated = false,
+        )
+
+        val rewritten = repository.resolveMarkdownImages(INSTANCE_ID, content)
+
+        assertTrue(rewritten.rawMarkdown.contains("![local](https://example.com/p/docs/a.png?sign=z)"))
+        assertTrue(rewritten.rawMarkdown.contains("![gone](missing.png)"))
+        assertTrue(rewritten.rawMarkdown.contains("![external](https://cdn.example.com/b.png)"))
+    }
+
+    @Test
+    fun `resolveMarkdownImages is a no-op when the document has no images`() = runTest {
+        val content = MarkdownPreviewContent(path = "/docs/readme.md", rawMarkdown = "# just text", basePath = "/docs", isTruncated = false)
+
+        val rewritten = repository.resolveMarkdownImages(INSTANCE_ID, content)
+
+        assertEquals(content, rewritten)
+    }
+
+    private fun fileDetail(path: String, rawUrl: String) = FileDetail(
+        name = path.substringAfterLast('/'),
+        path = path,
+        isDir = false,
+        size = 100,
+        modifiedAt = null,
+        type = 0,
+        sign = "",
+        rawUrl = rawUrl,
+        provider = "",
+    )
 
     private companion object {
         const val INSTANCE_ID = "inst-1"

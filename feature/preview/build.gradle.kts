@@ -78,6 +78,10 @@ dependencies {
     // Markdown rendering for the in-app markdown preview (S3, DEC-2).
     implementation(libs.markwon.core)
 
+    // Markdown embedded images (v1.0 S4, DEC-606): same-version companion
+    // module, adds ImagesPlugin's default network/data-URI SchemeHandlers.
+    implementation(libs.markwon.image)
+
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)

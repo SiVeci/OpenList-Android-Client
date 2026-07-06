@@ -1,6 +1,7 @@
 package io.openlist.client.core.domain
 
 import io.openlist.client.core.common.ApiResult
+import io.openlist.client.core.model.MarkdownImageSource
 import io.openlist.client.core.model.MarkdownPreviewContent
 import io.openlist.client.core.model.PreviewTarget
 import io.openlist.client.core.model.PreviewUrl
@@ -43,4 +44,23 @@ interface PreviewRepository {
      * (the prefix path itself, plus anything nested under it) — used after
      * rename/remove/move/copy on a directory. */
     suspend fun invalidateByPrefix(instanceId: String, pathPrefix: String)
+
+    /**
+     * Classifies+resolves one Markdown image reference (v1.0_PRD §7.4).
+     * Absolute http(s)/data URLs pass through as [MarkdownImageSource.External]
+     * (untouched, never given credentials); a same-instance relative path
+     * (resolved against [basePath]) becomes [MarkdownImageSource.Internal] via
+     * the same unauthenticated `fs/get` mechanism every other file preview
+     * uses (V-608 — reusable signed URL, no extra headers needed).
+     */
+    suspend fun resolveMarkdownImage(instanceId: String, basePath: String, imageRef: String): MarkdownImageSource
+
+    /**
+     * Rewrites every embedded image reference in [content]'s raw markdown to
+     * its resolved [MarkdownImageSource.Internal] URL (v1.0 S4). Unresolvable
+     * or external refs are left exactly as written — an external URL never
+     * needs rewriting, and an unresolvable one degrades to Markwon's default
+     * "no image, text continues" behavior rather than a broken placeholder.
+     */
+    suspend fun resolveMarkdownImages(instanceId: String, content: MarkdownPreviewContent): MarkdownPreviewContent
 }

@@ -8,8 +8,10 @@ import io.openlist.client.core.common.DispatcherProvider
 import io.openlist.client.core.common.DomainError
 import io.openlist.client.core.database.dao.PreviewCacheDao
 import io.openlist.client.core.database.entity.PreviewCacheEntity
+import io.openlist.client.core.domain.FilesRepository
 import io.openlist.client.core.domain.InstanceRepository
 import io.openlist.client.core.domain.PreviewRepository
+import io.openlist.client.core.model.MarkdownImageSource
 import io.openlist.client.core.model.MarkdownPreviewContent
 import io.openlist.client.core.model.PreviewFallback
 import io.openlist.client.core.model.PreviewKind
@@ -72,6 +74,7 @@ class PreviewRepositoryImpl @Inject constructor(
     private val dispatcherProvider: DispatcherProvider,
     private val json: Json,
     @ApplicationContext private val context: Context,
+    private val filesRepository: FilesRepository,
 ) : PreviewRepository {
 
     override suspend fun resolvePreview(instanceId: String, path: String): ApiResult<PreviewTarget> {
@@ -234,6 +237,58 @@ class PreviewRepositoryImpl @Inject constructor(
                 previewCacheDao.deleteByPathPrefix(instanceId, normalizedPrefix)
             }
         }
+    }
+
+    override suspend fun resolveMarkdownImage(instanceId: String, basePath: String, imageRef: String): MarkdownImageSource {
+        val trimmed = imageRef.trim()
+        if (trimmed.isEmpty()) return MarkdownImageSource.Unresolvable
+        if (trimmed.startsWith("http://", ignoreCase = true) ||
+            trimmed.startsWith("https://", ignoreCase = true) ||
+            trimmed.startsWith("data:", ignoreCase = true)
+        ) {
+            // Absolute/external — passed straight through, no header ever
+            // gets attached to it (structural guarantee: this path never
+            // touches TokenProvider/AuthInterceptor at all).
+            return MarkdownImageSource.External(trimmed)
+        }
+        val resolvedPath = resolveRelativeMarkdownPath(basePath, trimmed)
+        return when (val result = filesRepository.getFile(instanceId, resolvedPath)) {
+            is ApiResult.Success -> result.data.rawUrl.takeIf { it.isNotBlank() }
+                ?.let { MarkdownImageSource.Internal(it) }
+                ?: MarkdownImageSource.Unresolvable
+            is ApiResult.Failure -> MarkdownImageSource.Unresolvable
+        }
+    }
+
+    override suspend fun resolveMarkdownImages(instanceId: String, content: MarkdownPreviewContent): MarkdownPreviewContent {
+        val matches = MARKDOWN_IMAGE_REF_REGEX.findAll(content.rawMarkdown).toList()
+        if (matches.isEmpty()) return content
+        val cache = mutableMapOf<String, MarkdownImageSource>()
+        val builder = StringBuilder(content.rawMarkdown)
+        // Reverse order so earlier match ranges stay valid as later ones are replaced.
+        for (match in matches.asReversed()) {
+            val urlGroup = match.groups[2] ?: continue
+            val ref = urlGroup.value
+            val resolved = cache.getOrPut(ref) { resolveMarkdownImage(instanceId, content.basePath, ref) }
+            val internalUrl = (resolved as? MarkdownImageSource.Internal)?.url ?: continue
+            builder.replace(urlGroup.range.first, urlGroup.range.last + 1, internalUrl)
+        }
+        return content.copy(rawMarkdown = builder.toString())
+    }
+
+    /** Resolves `.`/`..`/plain segments against [basePath] purely by segment
+     * list manipulation — [OpenListPathCodec.child] alone doesn't collapse
+     * `..`, which relative Markdown image references commonly use. */
+    private fun resolveRelativeMarkdownPath(basePath: String, ref: String): String {
+        val segments = OpenListPathCodec.segments(basePath).toMutableList()
+        for (part in ref.split('/')) {
+            when (part) {
+                "", "." -> Unit
+                ".." -> if (segments.isNotEmpty()) segments.removeAt(segments.lastIndex)
+                else -> segments.add(part)
+            }
+        }
+        return "/" + segments.joinToString("/")
     }
 
     /** Looks up a not-yet-expired `preview_cache` row of [kind] whose
@@ -447,6 +502,13 @@ class PreviewRepositoryImpl @Inject constructor(
 
         private const val KIND_TEXT = "TEXT"
         private const val KIND_MARKDOWN = "MARKDOWN"
+
+        /** Matches CommonMark inline image syntax `![alt](url)` / `![alt](url "title")`.
+         * Known limitation (v1.0 minimal scope): reference-style images
+         * (`![alt][ref]` + a separate `[ref]: url` definition) aren't matched —
+         * they fall back to Markwon's default unresolved-relative-path
+         * behavior (no image, text continues), same as any other unresolvable ref. */
+        private val MARKDOWN_IMAGE_REF_REGEX = Regex("""!\[([^\]]*)]\(([^)\s]+)(?:\s+"[^"]*")?\)""")
     }
 }
 
