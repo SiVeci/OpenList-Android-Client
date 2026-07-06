@@ -65,6 +65,9 @@ fun AddInstanceScreen(
                 modifier = Modifier.fillMaxWidth(),
                 supportingText = "必须以 http:// 或 https:// 开头，支持部署在子路径",
             )
+            if (uiState.url.trim().startsWith("http://", ignoreCase = true)) {
+                StatusBadge(text = "明文 HTTP：登录凭据与文件内容将不加密传输，建议仅在可信内网使用", tone = StatusTone.WARNING)
+            }
             AppTextField(
                 value = uiState.name,
                 onValueChange = viewModel::onNameChange,
