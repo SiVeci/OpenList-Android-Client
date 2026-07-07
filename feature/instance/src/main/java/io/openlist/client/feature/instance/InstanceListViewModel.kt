@@ -16,6 +16,7 @@ import io.openlist.client.core.model.resolveAdminEntryVisibility
 import io.openlist.client.core.model.summarizeTasks
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -96,6 +97,22 @@ class InstanceListViewModel @Inject constructor(
             taskSummary = taskSummary,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
+
+    private val refreshedTaskInstances = mutableSetOf<String>()
+
+    init {
+        viewModelScope.launch {
+            currentInstance
+                .map { it?.id }
+                .distinctUntilChanged()
+                .collect { instanceId ->
+                    if (instanceId != null && refreshedTaskInstances.add(instanceId)) {
+                        taskAggregationRepository.refreshDownloadStatuses(instanceId)
+                        taskAggregationRepository.refreshRemoteTasks(instanceId)
+                    }
+                }
+        }
+    }
 
     /** Marks [instance] current (v0.1_PRD §6.1 "点击进入该实例"); Login screen
      * decides whether that's enough to skip straight to the file page. */
