@@ -7,8 +7,17 @@ import io.openlist.client.core.common.ApiResult
 import io.openlist.client.core.common.toUserMessage
 import io.openlist.client.core.domain.AuthRepository
 import io.openlist.client.core.domain.InstanceRepository
+import io.openlist.client.core.domain.TaskAggregationRepository
+import io.openlist.client.core.model.AdminEntryVisibility
 import io.openlist.client.core.model.Instance
 import io.openlist.client.core.model.Session
+import io.openlist.client.core.model.TaskSummary
+import io.openlist.client.core.model.resolveAdminEntryVisibility
+import io.openlist.client.core.model.summarizeTasks
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -19,10 +28,27 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+data class HomeUiState(
+    val instances: List<Instance> = emptyList(),
+    val currentInstance: Instance? = null,
+    val sessionsByInstanceId: Map<String, Session> = emptyMap(),
+    val currentSession: Session? = null,
+    val adminEntryVisibility: AdminEntryVisibility = AdminEntryVisibility.HIDDEN,
+    val taskSummary: TaskSummary = TaskSummary(
+        runningCount = 0,
+        pendingCount = 0,
+        failedCount = 0,
+        completedCount = 0,
+        unknownCount = 0,
+    ),
+)
+
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class InstanceListViewModel @Inject constructor(
     private val instanceRepository: InstanceRepository,
     authRepository: AuthRepository,
+    private val taskAggregationRepository: TaskAggregationRepository,
 ) : ViewModel() {
 
     val instances: StateFlow<List<Instance>> = instanceRepository.observeAll()
@@ -34,6 +60,42 @@ class InstanceListViewModel @Inject constructor(
 
     private val _connectionStatus = MutableStateFlow<Map<String, ConnectionCheck>>(emptyMap())
     val connectionStatus: StateFlow<Map<String, ConnectionCheck>> = _connectionStatus.asStateFlow()
+
+    private val currentInstance: StateFlow<Instance?> = instances
+        .map { list -> list.firstOrNull { it.isCurrent } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    private val taskSummary: StateFlow<TaskSummary> = currentInstance
+        .flatMapLatest { instance ->
+            if (instance == null) flowOf(emptyList())
+            else taskAggregationRepository.observeAllTasks(instance.id)
+        }
+        .map(::summarizeTasks)
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            summarizeTasks(emptyList()),
+        )
+
+    val homeUiState: StateFlow<HomeUiState> = combine(
+        instances,
+        currentInstance,
+        sessionsByInstanceId,
+        taskSummary,
+    ) { instances, currentInstance, sessionsByInstanceId, taskSummary ->
+        val currentSession = currentInstance?.let { sessionsByInstanceId[it.id] }
+        HomeUiState(
+            instances = instances,
+            currentInstance = currentInstance,
+            sessionsByInstanceId = sessionsByInstanceId,
+            currentSession = currentSession,
+            adminEntryVisibility = resolveAdminEntryVisibility(
+                hasCurrentInstance = currentInstance != null,
+                session = currentSession,
+            ),
+            taskSummary = taskSummary,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
     /** Marks [instance] current (v0.1_PRD §6.1 "点击进入该实例"); Login screen
      * decides whether that's enough to skip straight to the file page. */
