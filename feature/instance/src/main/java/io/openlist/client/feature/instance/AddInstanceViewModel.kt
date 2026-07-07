@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.time.TimeSource
 import javax.inject.Inject
 
 data class AddInstanceUiState(
@@ -20,6 +21,7 @@ data class AddInstanceUiState(
     val note: String = "",
     val isTesting: Boolean = false,
     val testResult: ConnectionCheck? = null,
+    val testElapsedMillis: Long? = null,
     val isSaving: Boolean = false,
     val saveError: String? = null,
     val savedInstanceId: String? = null,
@@ -34,7 +36,7 @@ class AddInstanceViewModel @Inject constructor(
     val uiState: StateFlow<AddInstanceUiState> = _uiState.asStateFlow()
 
     fun onUrlChange(value: String) {
-        _uiState.update { it.copy(url = value, testResult = null, saveError = null) }
+        _uiState.update { it.copy(url = value, testResult = null, testElapsedMillis = null, saveError = null) }
     }
 
     fun onNameChange(value: String) {
@@ -48,7 +50,8 @@ class AddInstanceViewModel @Inject constructor(
     fun testConnection() {
         val rawUrl = _uiState.value.url
         viewModelScope.launch {
-            _uiState.update { it.copy(isTesting = true, testResult = null, saveError = null) }
+            _uiState.update { it.copy(isTesting = true, testResult = null, testElapsedMillis = null, saveError = null) }
+            val startedAt = TimeSource.Monotonic.markNow()
             val normalized = BaseUrlNormalizer.normalize(rawUrl)
             val status = when (normalized) {
                 is ApiResult.Failure -> ConnectionCheck.Unreachable(normalized.error.toUserMessage())
@@ -57,7 +60,13 @@ class AddInstanceViewModel @Inject constructor(
                     is ApiResult.Failure -> ConnectionCheck.Unreachable(result.error.toUserMessage())
                 }
             }
-            _uiState.update { it.copy(isTesting = false, testResult = status) }
+            _uiState.update {
+                it.copy(
+                    isTesting = false,
+                    testResult = status,
+                    testElapsedMillis = startedAt.elapsedNow().inWholeMilliseconds,
+                )
+            }
         }
     }
 
