@@ -9,6 +9,7 @@ import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -30,9 +31,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -43,6 +47,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import io.openlist.client.core.designsystem.Spacing
 import io.openlist.client.core.designsystem.components.AppTopBar
 import io.openlist.client.core.designsystem.components.ConfirmDialog
@@ -99,7 +104,7 @@ fun TaskCenterScreen(
             Column {
                 AppTopBar(title = "任务中心", onBack = onBack)
                 TaskTabRow(
-                    tabs = listOf("全部", "上传", "下载", "远程"),
+                    tabs = listOf("上传", "下载", "远程", "失败"),
                     selectedIndex = TaskTab.entries.indexOf(uiState.selectedTab),
                     onTabSelected = { index -> viewModel.selectTab(TaskTab.entries[index]) },
                 )
@@ -121,8 +126,8 @@ fun TaskCenterScreen(
                 onRefresh = { viewModel.refresh() },
                 modifier = Modifier.fillMaxSize(),
             ) {
-                val tasks = uiState.filteredTasks
-                if (tasks.isEmpty()) {
+                val groups = uiState.taskGroups
+                if (groups.isEmpty()) {
                     EmptyState(title = "暂无任务", modifier = Modifier.fillMaxSize())
                 } else {
                     LazyColumn(
@@ -130,13 +135,21 @@ fun TaskCenterScreen(
                         contentPadding = PaddingValues(Spacing.md),
                         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
-                        items(tasks, key = { it.id }) { task ->
-                            TaskRow(
-                                task = task,
-                                onCancel = { viewModel.openCancelConfirm(task) },
-                                onRetry = { viewModel.retryTask(task) },
-                                onOpenTarget = { viewModel.openTaskTarget(task, onOpenDirectory, onOpenFile) },
-                            )
+                        item {
+                            TaskSummaryStrip(summary = uiState.summary)
+                        }
+                        groups.forEach { group ->
+                            item(key = "group-${group.type}") {
+                                TaskGroupHeader(title = group.title)
+                            }
+                            items(group.tasks, key = { it.id }) { task ->
+                                TaskRow(
+                                    task = task,
+                                    onCancel = { viewModel.openCancelConfirm(task) },
+                                    onRetry = { viewModel.retryTask(task) },
+                                    onOpenTarget = { viewModel.openTaskTarget(task, onOpenDirectory, onOpenFile) },
+                                )
+                            }
                         }
                     }
                 }
@@ -184,6 +197,57 @@ fun TaskCenterScreen(
             )
         }
     }
+}
+
+@Composable
+private fun TaskSummaryStrip(summary: TaskSummary) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        tonalElevation = 0.dp,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            TaskSummaryItem(label = "运行中", value = summary.activeCount)
+            TaskSummaryDivider()
+            TaskSummaryItem(label = "失败", value = summary.failedCount)
+            TaskSummaryDivider()
+            TaskSummaryItem(label = "已完成", value = summary.completedCount)
+        }
+    }
+}
+
+@Composable
+private fun TaskSummaryItem(label: String, value: Int) {
+    Text(
+        text = "$value $label",
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurface,
+    )
+}
+
+@Composable
+private fun TaskSummaryDivider() {
+    Text(
+        text = "|",
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.outline,
+    )
+}
+
+@Composable
+private fun TaskGroupHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.padding(top = Spacing.sm),
+    )
 }
 
 @Composable

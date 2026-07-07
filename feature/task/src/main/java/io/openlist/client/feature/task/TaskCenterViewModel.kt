@@ -26,7 +26,26 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class TaskTab { ALL, UPLOAD, DOWNLOAD, REMOTE }
+enum class TaskTab { UPLOAD, DOWNLOAD, REMOTE, FAILED }
+
+enum class TaskGroupType(val title: String) {
+    RUNNING("运行中"),
+    FAILED("失败"),
+    COMPLETED("已完成"),
+}
+
+data class TaskSummary(
+    val activeCount: Int = 0,
+    val failedCount: Int = 0,
+    val completedCount: Int = 0,
+)
+
+data class TaskGroup(
+    val type: TaskGroupType,
+    val tasks: List<UnifiedTask>,
+) {
+    val title: String get() = "${type.title} (${tasks.size})"
+}
 
 data class OfflineDownloadUiState(
     val url: String = "",
@@ -41,7 +60,7 @@ data class OfflineDownloadUiState(
 
 data class TaskCenterUiState(
     val tasks: List<UnifiedTask> = emptyList(),
-    val selectedTab: TaskTab = TaskTab.ALL,
+    val selectedTab: TaskTab = TaskTab.UPLOAD,
     val isRefreshing: Boolean = false,
     val remoteErrorMessage: String? = null,
     val cancelConfirmTarget: UnifiedTask? = null,
@@ -49,17 +68,36 @@ data class TaskCenterUiState(
     val offlineDownload: OfflineDownloadUiState? = null,
     val snackbarMessage: String? = null,
 ) {
+    val summary: TaskSummary
+        get() = TaskSummary(
+            activeCount = tasks.count { it.isActiveTask() },
+            failedCount = tasks.count { it.status == UnifiedTaskStatus.FAILED },
+            completedCount = tasks.count { it.status == UnifiedTaskStatus.SUCCESS },
+        )
+
     val filteredTasks: List<UnifiedTask>
         get() = when (selectedTab) {
-            TaskTab.ALL -> tasks
             TaskTab.UPLOAD -> tasks.filter { it.source == TaskSource.LOCAL_UPLOAD }
             TaskTab.DOWNLOAD -> tasks.filter { it.source == TaskSource.LOCAL_DOWNLOAD }
             TaskTab.REMOTE -> tasks.filter { it.source == TaskSource.REMOTE }
+            TaskTab.FAILED -> tasks.filter { it.status == UnifiedTaskStatus.FAILED }
         }
+
+    val taskGroups: List<TaskGroup>
+        get() = groupTasks(filteredTasks)
 
     val hasRunningRemote: Boolean
         get() = tasks.any { it.source == TaskSource.REMOTE && (it.status == UnifiedTaskStatus.RUNNING || it.status == UnifiedTaskStatus.PENDING) }
 }
+
+internal fun groupTasks(tasks: List<UnifiedTask>): List<TaskGroup> = listOf(
+    TaskGroup(TaskGroupType.RUNNING, tasks.filter { it.isActiveTask() }),
+    TaskGroup(TaskGroupType.FAILED, tasks.filter { it.status == UnifiedTaskStatus.FAILED }),
+    TaskGroup(TaskGroupType.COMPLETED, tasks.filter { it.status == UnifiedTaskStatus.SUCCESS }),
+).filter { it.tasks.isNotEmpty() }
+
+private fun UnifiedTask.isActiveTask(): Boolean =
+    status == UnifiedTaskStatus.RUNNING || status == UnifiedTaskStatus.PENDING
 
 /**
  * P6 polling: while this ViewModel is alive (i.e. the task-center back-stack
