@@ -21,8 +21,19 @@ data class ShareListUiState(
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val shares: List<Share> = emptyList(),
+    val searchQuery: String = "",
+    val statusFilter: ShareStatusFilter = ShareStatusFilter.ALL,
     val errorMessage: String? = null,
-)
+) {
+    val visibleShares: List<Share>
+        get() = shares.filterForShareList(searchQuery, statusFilter)
+}
+
+enum class ShareStatusFilter(val label: String) {
+    ALL("全部"),
+    ENABLED("启用"),
+    DISABLED("停用"),
+}
 
 @HiltViewModel
 class ShareListViewModel @Inject constructor(
@@ -54,5 +65,32 @@ class ShareListViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    fun onSearchQueryChange(query: String) {
+        _uiState.update { it.copy(searchQuery = query) }
+    }
+
+    fun onStatusFilterChange(filter: ShareStatusFilter) {
+        _uiState.update { it.copy(statusFilter = filter) }
+    }
+}
+
+internal fun List<Share>.filterForShareList(
+    query: String,
+    statusFilter: ShareStatusFilter,
+): List<Share> {
+    val normalizedQuery = query.trim()
+    return filter { share ->
+        val matchesStatus = when (statusFilter) {
+            ShareStatusFilter.ALL -> true
+            ShareStatusFilter.ENABLED -> share.enabled
+            ShareStatusFilter.DISABLED -> !share.enabled
+        }
+        val matchesQuery = normalizedQuery.isBlank() ||
+            share.name.orEmpty().contains(normalizedQuery, ignoreCase = true) ||
+            share.paths.any { it.contains(normalizedQuery, ignoreCase = true) } ||
+            share.id.contains(normalizedQuery, ignoreCase = true)
+        matchesStatus && matchesQuery
     }
 }
