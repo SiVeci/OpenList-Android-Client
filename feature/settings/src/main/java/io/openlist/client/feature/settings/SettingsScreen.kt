@@ -27,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import io.openlist.client.core.designsystem.Spacing
 import io.openlist.client.core.designsystem.components.AppTopBar
+import io.openlist.client.core.model.AdminEntryVisibility
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,8 +65,18 @@ fun SettingsScreen(
                 HorizontalDivider()
             }
             when (adminEntryState) {
-                AdminEntryState.HIDDEN -> Unit
-                AdminEntryState.DISABLED_NOT_ADMIN -> {
+                AdminEntryVisibility.HIDDEN -> Unit
+                AdminEntryVisibility.DISABLED_UNAUTHENTICATED -> {
+                    val subtitle = currentInstanceName?.let { "$it · 请先登录管理员账号" } ?: "请先登录管理员账号"
+                    SettingsRow(
+                        title = "管理台",
+                        subtitle = subtitle,
+                        enabled = false,
+                        onClick = {},
+                    )
+                    HorizontalDivider()
+                }
+                AdminEntryVisibility.DISABLED_NOT_ADMIN -> {
                     val subtitle = currentInstanceName?.let { "$it · 需要管理员权限" } ?: "需要管理员权限"
                     SettingsRow(
                         title = "管理台",
@@ -75,7 +86,7 @@ fun SettingsScreen(
                     )
                     HorizontalDivider()
                 }
-                AdminEntryState.ENABLED -> {
+                AdminEntryVisibility.ENABLED -> {
                     val instanceId = currentInstanceId
                     if (instanceId != null) {
                         SettingsRow(
