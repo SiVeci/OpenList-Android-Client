@@ -36,6 +36,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.net.URLDecoder
+import java.util.Locale
 import javax.inject.Inject
 
 /** A single file/directory's write-action menu and the mkdir/rename/delete
@@ -48,6 +49,17 @@ sealed class FileListDialog {
 }
 
 enum class DirectoryPickerPurpose { MOVE, COPY }
+
+enum class FileSortKey(val label: String) {
+    NAME("名称"),
+    SIZE("大小"),
+    MODIFIED_AT("修改时间"),
+}
+
+enum class SortDirection(val label: String) {
+    ASCENDING("升序"),
+    DESCENDING("降序"),
+}
 
 /**
  * State for the move/copy target-directory picker (v0.2_EXECUTION_PLAN.md
@@ -70,6 +82,8 @@ data class FileListUiState(
     val instanceName: String = "",
     val currentPath: String = "/",
     val nodes: List<FileNode> = emptyList(),
+    val sortKey: FileSortKey = FileSortKey.NAME,
+    val sortDirection: SortDirection = SortDirection.ASCENDING,
     val lastRefreshTimestampMillis: Long? = null,
     val lastRefreshFromCache: Boolean = false,
     val isLoading: Boolean = true,
@@ -131,6 +145,7 @@ class FileListViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val instanceId: String = checkNotNull(savedStateHandle["instanceId"])
+    private var rawNodes: List<FileNode> = emptyList()
 
     private val _uiState = MutableStateFlow(FileListUiState())
     val uiState: StateFlow<FileListUiState> = _uiState.asStateFlow()
@@ -176,8 +191,9 @@ class FileListViewModel @Inject constructor(
             filesRepository.listDirectory(instanceId, normalized, forceRefresh).collect { result ->
                 when (result) {
                     is FileListResult.Cached -> _uiState.update {
+                        rawNodes = result.nodes
                         it.copy(
-                            nodes = result.nodes,
+                            nodes = sortNodes(result.nodes, it.sortKey, it.sortDirection),
                             fromCache = true,
                             lastRefreshTimestampMillis = result.cachedAt,
                             lastRefreshFromCache = true,
@@ -186,6 +202,7 @@ class FileListViewModel @Inject constructor(
                         )
                     }
                     is FileListResult.Fresh -> _uiState.update {
+                        rawNodes = result.nodes
                         // S7-T3 audit: a fresh fetch can downgrade the
                         // directory's write capability from optimistic
                         // true/unknown to confirmed false (e.g. permissions
@@ -196,7 +213,7 @@ class FileListViewModel @Inject constructor(
                         val revokedWrite = it.selectionMode && it.directoryCapability.canWrite != false &&
                             result.capability.canWrite == false
                         it.copy(
-                            nodes = result.nodes,
+                            nodes = sortNodes(result.nodes, it.sortKey, it.sortDirection),
                             fromCache = false,
                             lastRefreshTimestampMillis = System.currentTimeMillis(),
                             lastRefreshFromCache = false,
@@ -210,7 +227,9 @@ class FileListViewModel @Inject constructor(
                     }
                     is FileListResult.Error -> _uiState.update {
                         it.copy(
-                            nodes = result.staleCache ?: it.nodes,
+                            nodes = result.staleCache?.also { stale -> rawNodes = stale }?.let { stale ->
+                                sortNodes(stale, it.sortKey, it.sortDirection)
+                            } ?: it.nodes,
                             fromCache = result.staleCache != null,
                             isLoading = false,
                             isRefreshing = false,
@@ -223,6 +242,16 @@ class FileListViewModel @Inject constructor(
     }
 
     fun refresh() = navigateTo(_uiState.value.currentPath, forceRefresh = true)
+
+    fun updateSort(key: FileSortKey, direction: SortDirection) {
+        _uiState.update {
+            it.copy(
+                sortKey = key,
+                sortDirection = direction,
+                nodes = sortNodes(rawNodes.ifEmpty { it.nodes }, key, direction),
+            )
+        }
+    }
 
     fun navigateToParent() {
         navigateTo(OpenListPathCodec.parent(_uiState.value.currentPath))
@@ -610,3 +639,28 @@ class FileListViewModel @Inject constructor(
         }
     }
 }
+
+internal fun sortNodes(
+    nodes: List<FileNode>,
+    key: FileSortKey,
+    direction: SortDirection,
+): List<FileNode> {
+    val directionMultiplier = if (direction == SortDirection.ASCENDING) 1 else -1
+    return nodes.sortedWith { left, right ->
+        val directoryBucket = compareValues(left.isDir.not(), right.isDir.not())
+        if (directoryBucket != 0) return@sortedWith directoryBucket
+
+        val valueComparison = when (key) {
+            FileSortKey.NAME -> compareNames(left, right)
+            FileSortKey.SIZE -> compareValues(left.size, right.size)
+            FileSortKey.MODIFIED_AT -> compareValues(left.modifiedAt ?: Long.MIN_VALUE, right.modifiedAt ?: Long.MIN_VALUE)
+        }
+        if (valueComparison != 0) valueComparison * directionMultiplier else compareNames(left, right)
+    }
+}
+
+private fun compareNames(left: FileNode, right: FileNode): Int =
+    compareValues(
+        left.name.lowercase(Locale.getDefault()),
+        right.name.lowercase(Locale.getDefault()),
+    )

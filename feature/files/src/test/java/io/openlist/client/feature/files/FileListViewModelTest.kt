@@ -89,6 +89,27 @@ class FileListViewModelTest {
         assertEquals(false, viewModel.uiState.value.isLoading)
     }
 
+    @Test
+    fun `sort nodes keeps directories first and orders by name`() {
+        val sorted = sortNodes(sampleNodes(), FileSortKey.NAME, SortDirection.ASCENDING)
+
+        assertEquals(listOf("Alpha", "zeta", "alpha.txt", "video.mp4"), sorted.map { it.name })
+    }
+
+    @Test
+    fun `sort nodes orders files by size descending`() {
+        val sorted = sortNodes(sampleNodes(), FileSortKey.SIZE, SortDirection.DESCENDING)
+
+        assertEquals(listOf("Alpha", "zeta", "video.mp4", "alpha.txt"), sorted.map { it.name })
+    }
+
+    @Test
+    fun `sort nodes orders files by modified time ascending`() {
+        val sorted = sortNodes(sampleNodes(), FileSortKey.MODIFIED_AT, SortDirection.ASCENDING)
+
+        assertEquals(listOf("zeta", "Alpha", "alpha.txt", "video.mp4"), sorted.map { it.name })
+    }
+
     private fun viewModel(
         savedPath: String? = null,
         filesRepository: FakeFilesRepository = FakeFilesRepository(),
@@ -112,6 +133,29 @@ class FileListViewModelTest {
             recentPathRepository = recentPathRepository,
         )
     }
+
+    private fun sampleNodes(): List<FileNode> = listOf(
+        fileNode(name = "video.mp4", isDir = false, size = 200, modifiedAt = 400),
+        fileNode(name = "Alpha", isDir = true, size = 0, modifiedAt = 300),
+        fileNode(name = "alpha.txt", isDir = false, size = 10, modifiedAt = 100),
+        fileNode(name = "zeta", isDir = true, size = 0, modifiedAt = 100),
+    )
+
+    private fun fileNode(
+        name: String,
+        isDir: Boolean,
+        size: Long,
+        modifiedAt: Long?,
+    ): FileNode = FileNode(
+        name = name,
+        path = "/$name",
+        isDir = isDir,
+        size = size,
+        modifiedAt = modifiedAt,
+        sign = "",
+        thumb = "",
+        type = 0,
+    )
 
     private class FakeRecentPathRepository(
         private val shouldFail: Boolean = false,

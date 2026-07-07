@@ -41,6 +41,7 @@ fun ListRowItem(
     modifier: Modifier = Modifier,
     sizeText: String? = null,
     modifiedText: String? = null,
+    badges: List<String> = emptyList(),
     onClick: () -> Unit = {},
     onLongClick: (() -> Unit)? = null,
     selectionMode: Boolean = false,
@@ -80,6 +81,13 @@ fun ListRowItem(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (badges.isNotEmpty()) {
+                CapabilityChips(
+                    labels = badges,
+                    tone = StatusTone.SUCCESS,
+                    modifier = Modifier.padding(top = Spacing.xxs),
                 )
             }
         }

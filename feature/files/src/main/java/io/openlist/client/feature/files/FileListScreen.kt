@@ -20,6 +20,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DriveFileMove
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.ContentCopy
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.FileCopy
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -39,6 +41,8 @@ import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Badge
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -83,6 +87,7 @@ import io.openlist.client.core.designsystem.components.TextInputDialog
 import io.openlist.client.core.designsystem.components.UploadItemStatus
 import io.openlist.client.core.designsystem.components.UploadProgressItem
 import io.openlist.client.core.model.FileNode
+import io.openlist.client.core.model.PreviewKind
 import io.openlist.client.core.model.PreviewKindResolver
 import io.openlist.client.core.model.UploadStatus
 import io.openlist.client.core.model.UploadTask
@@ -160,6 +165,7 @@ fun FileListScreen(
             FileListRefreshStrip(
                 uiState = uiState,
                 onRefresh = { viewModel.refresh() },
+                onSortChange = { key, direction -> viewModel.updateSort(key, direction) },
             )
             uiState.errorMessage?.let { message ->
                 ErrorBar(message = message, onRetry = { viewModel.refresh() })
@@ -182,6 +188,7 @@ fun FileListScreen(
                                 isDir = node.isDir,
                                 sizeText = if (node.isDir) null else formatSize(node.size),
                                 modifiedText = node.modifiedAt?.let(::formatDate),
+                                badges = abilityBadges(node),
                                 selectionMode = uiState.selectionMode,
                                 selected = node.path in uiState.selectedPaths,
                                 onClick = { viewModel.onNodeClick(node, onOpenFileDetail, onOpenFile) },
@@ -435,7 +442,9 @@ private fun FileListHeader(
 private fun FileListRefreshStrip(
     uiState: FileListUiState,
     onRefresh: () -> Unit,
+    onSortChange: (FileSortKey, SortDirection) -> Unit,
 ) {
+    var showSortMenu by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -460,6 +469,42 @@ private fun FileListRefreshStrip(
         TextButton(onClick = onRefresh, enabled = !uiState.isRefreshing) {
             Text(if (uiState.isRefreshing) "刷新中" else "刷新")
         }
+        Box {
+            TextButton(onClick = { showSortMenu = true }) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Sort,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text("${uiState.sortKey.label} · ${uiState.sortDirection.label}")
+                Icon(
+                    imageVector = Icons.Filled.KeyboardArrowDown,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            DropdownMenu(
+                expanded = showSortMenu,
+                onDismissRequest = { showSortMenu = false },
+            ) {
+                FileSortKey.entries.forEach { key ->
+                    DropdownMenuItem(
+                        text = { Text("${key.label} · 升序") },
+                        onClick = {
+                            onSortChange(key, SortDirection.ASCENDING)
+                            showSortMenu = false
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("${key.label} · 降序") },
+                        onClick = {
+                            onSortChange(key, SortDirection.DESCENDING)
+                            showSortMenu = false
+                        },
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -467,6 +512,16 @@ private fun refreshLabel(uiState: FileListUiState): String {
     val timestamp = uiState.lastRefreshTimestampMillis ?: return if (uiState.fromCache) "当前为本地缓存数据" else "下拉或点按刷新"
     val prefix = if (uiState.lastRefreshFromCache || uiState.fromCache) "缓存于" else "刚刚刷新"
     return "$prefix ${formatDate(timestamp)}"
+}
+
+private fun abilityBadges(node: FileNode): List<String> {
+    if (node.isDir) return emptyList()
+    val kind = PreviewKindResolver.resolve(node.name)
+    return when {
+        kind == PreviewKind.VIDEO || kind == PreviewKind.AUDIO -> listOf("可播放")
+        PreviewKindResolver.isInAppPreviewable(kind) -> listOf("可预览")
+        else -> emptyList()
+    }
 }
 
 /** "下载" and "详情" both route to the file detail screen (v0.1's existing
