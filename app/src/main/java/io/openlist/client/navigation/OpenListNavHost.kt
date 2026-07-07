@@ -1,14 +1,25 @@
 package io.openlist.client.navigation
 
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Assignment
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import io.openlist.client.core.designsystem.components.AppNavigationBar
+import io.openlist.client.core.designsystem.components.AppNavigationItem
 import io.openlist.client.feature.admin.AdminHostScreen
 import io.openlist.client.feature.auth.LoginScreen
 import io.openlist.client.feature.files.FileDetailScreen
@@ -34,8 +45,13 @@ fun OpenListNavHost(navController: NavHostController = rememberNavController()) 
     // watch accordingly; see SessionExpiryViewModel's KDoc for why this can't
     // double-fire while already on Login.
     val sessionExpiryViewModel: SessionExpiryViewModel = hiltViewModel()
+    val mainNavViewModel: MainNavViewModel = hiltViewModel()
+    val mainNavUiState by mainNavViewModel.uiState.collectAsState()
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = currentBackStackEntry?.destination?.route
+    val mainNavigationState = resolveMainNavigationState(currentRoute)
     val currentInstanceId = currentBackStackEntry?.arguments?.getString("instanceId")
+    val tabInstanceId = currentInstanceId ?: mainNavUiState.currentInstanceId
     LaunchedEffect(currentInstanceId) {
         if (currentInstanceId == null) return@LaunchedEffect
         sessionExpiryViewModel.observeExpiry(currentInstanceId).collect {
@@ -45,7 +61,39 @@ fun OpenListNavHost(navController: NavHostController = rememberNavController()) 
         }
     }
 
-    NavHost(navController = navController, startDestination = Routes.SPLASH) {
+    Scaffold(
+        bottomBar = {
+            if (mainNavigationState.showBar) {
+                AppNavigationBar(
+                    items = mainNavigationItems(
+                        state = mainNavigationState,
+                        uiState = mainNavUiState,
+                        instanceId = tabInstanceId,
+                        onHome = {
+                            navController.navigate(Routes.INSTANCE_LIST) {
+                                popUpTo(0)
+                                launchSingleTop = true
+                            }
+                        },
+                        onFiles = { instanceId ->
+                            navController.navigateViaHome(Routes.fileList(instanceId))
+                        },
+                        onTasks = { instanceId ->
+                            navController.navigateViaHome(Routes.taskCenter(instanceId))
+                        },
+                        onMine = {
+                            navController.navigateViaHome(Routes.SETTINGS)
+                        },
+                    ),
+                )
+            }
+        },
+    ) { innerPadding ->
+        NavHost(
+            navController = navController,
+            startDestination = Routes.SPLASH,
+            modifier = Modifier.padding(innerPadding),
+        ) {
         composable(Routes.SPLASH) {
             SplashScreen(onNavigate = { route, popSplash ->
                 navController.navigate(route) {
@@ -190,4 +238,59 @@ fun OpenListNavHost(navController: NavHostController = rememberNavController()) 
             )
         }
     }
+    }
+}
+
+private fun NavHostController.navigateViaHome(route: String) {
+    navigate(Routes.INSTANCE_LIST) {
+        popUpTo(0)
+        launchSingleTop = true
+    }
+    if (route != Routes.INSTANCE_LIST) {
+        navigate(route) {
+            launchSingleTop = true
+        }
+    }
+}
+
+@Composable
+private fun mainNavigationItems(
+    state: MainNavigationState,
+    uiState: MainNavUiState,
+    instanceId: String?,
+    onHome: () -> Unit,
+    onFiles: (String) -> Unit,
+    onTasks: (String) -> Unit,
+    onMine: () -> Unit,
+): List<AppNavigationItem> {
+    val instanceTabEnabled = uiState.hasInstances && instanceId != null
+    return listOf(
+        AppNavigationItem(
+            label = "首页",
+            icon = Icons.Outlined.Home,
+            selected = state.selectedTab == MainNavigationTab.HOME,
+            onClick = onHome,
+        ),
+        AppNavigationItem(
+            label = "文件",
+            icon = Icons.Outlined.Folder,
+            selected = state.selectedTab == MainNavigationTab.FILES,
+            enabled = instanceTabEnabled,
+            onClick = { instanceId?.let(onFiles) },
+        ),
+        AppNavigationItem(
+            label = "任务",
+            icon = Icons.Outlined.Assignment,
+            selected = state.selectedTab == MainNavigationTab.TASKS,
+            enabled = instanceTabEnabled,
+            badgeCount = uiState.activeTaskCount,
+            onClick = { instanceId?.let(onTasks) },
+        ),
+        AppNavigationItem(
+            label = "我的",
+            icon = Icons.Outlined.Person,
+            selected = state.selectedTab == MainNavigationTab.MINE,
+            onClick = onMine,
+        ),
+    )
 }
