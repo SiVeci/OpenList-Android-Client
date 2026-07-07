@@ -81,6 +81,8 @@ import io.openlist.client.core.designsystem.components.EmptyState
 import io.openlist.client.core.designsystem.components.ErrorBar
 import io.openlist.client.core.designsystem.components.FileActionItem
 import io.openlist.client.core.designsystem.components.FileActionSheet
+import io.openlist.client.core.designsystem.components.fileKindIcon
+import io.openlist.client.core.designsystem.components.fileKindOf
 import io.openlist.client.core.designsystem.components.GroupCard
 import io.openlist.client.core.designsystem.components.ListRowItem
 import io.openlist.client.core.designsystem.components.LoadingState
@@ -224,22 +226,32 @@ fun FileListScreen(
     }
 
     uiState.actionSheetTarget?.let { node ->
+        val actions = buildFileActions(
+            node = node,
+            canWrite = uiState.canWrite,
+            canShare = uiState.canWrite,
+            onOpenDetail = { onOpenFileDetail(node.path) },
+            onOpenFile = { onOpenFile(node.path) },
+            onRename = { viewModel.openRenameDialog(node) },
+            onMove = { viewModel.openMovePicker(node) },
+            onCopy = { viewModel.openCopyPicker(node) },
+            onDelete = { viewModel.openDeleteConfirm(node) },
+            onCopyPath = { clipboardManager.setText(AnnotatedString(node.path)) },
+            onCopyName = { clipboardManager.setText(AnnotatedString(node.name)) },
+            onShare = { viewModel.openShareCreate(node) },
+        )
         FileActionSheet(
-            actions = buildFileActions(
-                node = node,
-                canWrite = uiState.canWrite,
-                canShare = uiState.canWrite,
-                onOpenDetail = { onOpenFileDetail(node.path) },
-                onOpenFile = { onOpenFile(node.path) },
-                onRename = { viewModel.openRenameDialog(node) },
-                onMove = { viewModel.openMovePicker(node) },
-                onCopy = { viewModel.openCopyPicker(node) },
-                onDelete = { viewModel.openDeleteConfirm(node) },
-                onCopyPath = { clipboardManager.setText(AnnotatedString(node.path)) },
-                onCopyName = { clipboardManager.setText(AnnotatedString(node.name)) },
-                onShare = { viewModel.openShareCreate(node) },
-            ),
+            actions = actions,
             onDismiss = { viewModel.dismissActionSheet() },
+            headerTitle = node.name,
+            headerSubtitle = node.path,
+            headerMetadata = listOfNotNull(
+                if (node.isDir) "文件夹" else formatSize(node.size),
+                node.modifiedAt?.let(::formatDate),
+            ).joinToString(" · ").ifBlank { null },
+            headerIcon = fileKindIcon(fileKindOf(node.name, node.isDir)),
+            headerBadges = abilityBadges(node),
+            primaryActions = primaryFileActions(actions),
         )
     }
 
@@ -532,6 +544,11 @@ private fun abilityBadges(node: FileNode): List<String> {
         PreviewKindResolver.isInAppPreviewable(kind) -> listOf("可预览")
         else -> emptyList()
     }
+}
+
+private fun primaryFileActions(actions: List<FileActionItem>): List<FileActionItem> {
+    val preferred = listOf("预览", "下载", "分享")
+    return preferred.mapNotNull { label -> actions.firstOrNull { it.label == label } }
 }
 
 @Composable
