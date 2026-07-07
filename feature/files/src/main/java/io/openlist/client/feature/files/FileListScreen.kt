@@ -41,12 +41,15 @@ import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Badge
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -170,45 +173,52 @@ fun FileListScreen(
             uiState.errorMessage?.let { message ->
                 ErrorBar(message = message, onRetry = { viewModel.refresh() })
             }
-            PullToRefreshBox(
-                isRefreshing = uiState.isRefreshing,
-                onRefresh = { viewModel.refresh() },
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                when {
-                    uiState.isLoading -> LoadingState(modifier = Modifier.fillMaxSize())
-                    uiState.nodes.isEmpty() -> EmptyState(
-                        title = "此目录为空",
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        items(uiState.nodes, key = { it.path }) { node ->
-                            ListRowItem(
-                                name = node.name,
-                                isDir = node.isDir,
-                                sizeText = if (node.isDir) null else formatSize(node.size),
-                                modifiedText = node.modifiedAt?.let(::formatDate),
-                                badges = abilityBadges(node),
-                                selectionMode = uiState.selectionMode,
-                                selected = node.path in uiState.selectedPaths,
-                                onClick = { viewModel.onNodeClick(node, onOpenFileDetail, onOpenFile) },
-                                onLongClick = if (uiState.canWrite && !uiState.selectionMode) {
-                                    { viewModel.enterSelectionMode(node) }
-                                } else {
-                                    null
-                                },
-                                trailing = {
-                                    if (!uiState.selectionMode) {
-                                        IconButton(onClick = { viewModel.openActionSheet(node) }) {
-                                            Icon(Icons.Filled.MoreVert, contentDescription = "更多")
+            Box(modifier = Modifier.fillMaxSize()) {
+                PullToRefreshBox(
+                    isRefreshing = uiState.isRefreshing,
+                    onRefresh = { viewModel.refresh() },
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    when {
+                        uiState.isLoading -> LoadingState(modifier = Modifier.fillMaxSize())
+                        uiState.nodes.isEmpty() -> EmptyState(
+                            title = "此目录为空",
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
+                            items(uiState.nodes, key = { it.path }) { node ->
+                                ListRowItem(
+                                    name = node.name,
+                                    isDir = node.isDir,
+                                    sizeText = if (node.isDir) null else formatSize(node.size),
+                                    modifiedText = node.modifiedAt?.let(::formatDate),
+                                    badges = abilityBadges(node),
+                                    selectionMode = uiState.selectionMode,
+                                    selected = node.path in uiState.selectedPaths,
+                                    onClick = { viewModel.onNodeClick(node, onOpenFileDetail, onOpenFile) },
+                                    onLongClick = if (uiState.canWrite && !uiState.selectionMode) {
+                                        { viewModel.enterSelectionMode(node) }
+                                    } else {
+                                        null
+                                    },
+                                    trailing = {
+                                        if (!uiState.selectionMode) {
+                                            IconButton(onClick = { viewModel.openActionSheet(node) }) {
+                                                Icon(Icons.Filled.MoreVert, contentDescription = "更多")
+                                            }
                                         }
-                                    }
-                                },
-                            )
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                    },
+                                )
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            }
                         }
                     }
                 }
+                UploadProgressBanner(
+                    tasks = uiState.uploadTasks,
+                    onOpenUploadPanel = { viewModel.openUploadPanel() },
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
             }
         }
     }
@@ -521,6 +531,72 @@ private fun abilityBadges(node: FileNode): List<String> {
         kind == PreviewKind.VIDEO || kind == PreviewKind.AUDIO -> listOf("可播放")
         PreviewKindResolver.isInAppPreviewable(kind) -> listOf("可预览")
         else -> emptyList()
+    }
+}
+
+@Composable
+private fun UploadProgressBanner(
+    tasks: List<UploadTask>,
+    onOpenUploadPanel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val visibleTasks = tasks.filter { it.status == UploadStatus.PENDING || it.status == UploadStatus.RUNNING }
+    if (visibleTasks.isEmpty()) return
+
+    val uploadedBytes = visibleTasks.sumOf { it.uploadedBytes }
+    val totalBytes = visibleTasks.mapNotNull { it.totalBytes }.takeIf { it.size == visibleTasks.size }?.sum()
+    val progress = totalBytes?.takeIf { it > 0 }?.let { uploadedBytes.toFloat() / it }
+    val targetDir = visibleTasks.firstOrNull()?.targetDir ?: ""
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(Spacing.md),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Spacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.CloudSync,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp),
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
+            ) {
+                Text(
+                    text = "上传 ${visibleTasks.size} 个文件",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
+                Text(
+                    text = if (targetDir.isBlank()) "正在上传" else "正在上传到：$targetDir",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (progress != null) {
+                    LinearProgressIndicator(
+                        progress = { progress.coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+            TextButton(onClick = onOpenUploadPanel) {
+                Text("查看")
+            }
+        }
     }
 }
 
