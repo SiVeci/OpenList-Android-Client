@@ -58,6 +58,11 @@ fun OpenListNavHost(navController: NavHostController = rememberNavController()) 
                 onAddInstance = { navController.navigate(Routes.ADD_INSTANCE) },
                 onOpenInstance = { instanceId -> navController.navigate(Routes.login(instanceId)) },
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                onOpenFiles = { instanceId -> navController.navigate(Routes.fileList(instanceId)) },
+                onOpenSearch = { instanceId -> navController.navigate(Routes.search(instanceId)) },
+                onOpenTaskCenter = { instanceId -> navController.navigate(Routes.taskCenter(instanceId)) },
+                onOpenShareList = { instanceId -> navController.navigate(Routes.shareList(instanceId)) },
+                onOpenAdmin = { instanceId -> navController.navigate(Routes.admin(instanceId)) },
             )
         }
         composable(Routes.ADD_INSTANCE) {
