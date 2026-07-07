@@ -153,6 +153,13 @@ fun InstanceListScreen(
                     )
                 }
                 item {
+                    HomeRecentSection(
+                        currentInstance = homeUiState.currentInstance,
+                        onOpenFiles = onOpenFiles,
+                        modifier = Modifier.padding(horizontal = Spacing.md),
+                    )
+                }
+                item {
                     HomeInstancesSection(
                         instances = instances,
                         sessionsByInstanceId = sessionsByInstanceId,
@@ -467,6 +474,61 @@ private fun InstanceSwitcherRow(
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+@Composable
+private fun HomeRecentSection(
+    currentInstance: Instance?,
+    onOpenFiles: (instanceId: String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        SectionHeader(title = "继续浏览")
+        GroupCard(modifier = Modifier.padding(top = Spacing.sm)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = currentInstance != null) {
+                        currentInstance?.let { onOpenFiles(it.id) }
+                    }
+                    .padding(vertical = Spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), MaterialTheme.shapes.large),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Folder,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "根目录",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = currentInstance?.name ?: "选择实例后可用",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
