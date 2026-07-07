@@ -107,6 +107,7 @@ fun OpenListNavHost(navController: NavHostController = rememberNavController()) 
                 onOpenInstance = { instanceId -> navController.navigate(Routes.login(instanceId)) },
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                 onOpenFiles = { instanceId -> navController.navigate(Routes.fileList(instanceId)) },
+                onOpenRecentPath = { instanceId, path -> navController.navigate(Routes.fileList(instanceId, path)) },
                 onOpenSearch = { instanceId -> navController.navigate(Routes.search(instanceId)) },
                 onOpenTaskCenter = { instanceId -> navController.navigate(Routes.taskCenter(instanceId)) },
                 onOpenShareList = { instanceId -> navController.navigate(Routes.shareList(instanceId)) },

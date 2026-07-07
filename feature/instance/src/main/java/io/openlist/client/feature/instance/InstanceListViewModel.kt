@@ -7,9 +7,11 @@ import io.openlist.client.core.common.ApiResult
 import io.openlist.client.core.common.toUserMessage
 import io.openlist.client.core.domain.AuthRepository
 import io.openlist.client.core.domain.InstanceRepository
+import io.openlist.client.core.domain.RecentPathRepository
 import io.openlist.client.core.domain.TaskAggregationRepository
 import io.openlist.client.core.model.AdminEntryVisibility
 import io.openlist.client.core.model.Instance
+import io.openlist.client.core.model.RecentPath
 import io.openlist.client.core.model.Session
 import io.openlist.client.core.model.TaskSummary
 import io.openlist.client.core.model.resolveAdminEntryVisibility
@@ -35,6 +37,7 @@ data class HomeUiState(
     val sessionsByInstanceId: Map<String, Session> = emptyMap(),
     val currentSession: Session? = null,
     val adminEntryVisibility: AdminEntryVisibility = AdminEntryVisibility.HIDDEN,
+    val recentPaths: List<RecentPath> = emptyList(),
     val taskSummary: TaskSummary = TaskSummary(
         runningCount = 0,
         pendingCount = 0,
@@ -50,6 +53,7 @@ class InstanceListViewModel @Inject constructor(
     private val instanceRepository: InstanceRepository,
     authRepository: AuthRepository,
     private val taskAggregationRepository: TaskAggregationRepository,
+    recentPathRepository: RecentPathRepository,
 ) : ViewModel() {
 
     val instances: StateFlow<List<Instance>> = instanceRepository.observeAll()
@@ -78,12 +82,17 @@ class InstanceListViewModel @Inject constructor(
             summarizeTasks(emptyList()),
         )
 
+    private val recentPaths: StateFlow<List<RecentPath>> = recentPathRepository.observeAll()
+        .map { recents -> recents.take(HOME_RECENT_LIMIT) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     val homeUiState: StateFlow<HomeUiState> = combine(
         instances,
         currentInstance,
         sessionsByInstanceId,
         taskSummary,
-    ) { instances, currentInstance, sessionsByInstanceId, taskSummary ->
+        recentPaths,
+    ) { instances, currentInstance, sessionsByInstanceId, taskSummary, recentPaths ->
         val currentSession = currentInstance?.let { sessionsByInstanceId[it.id] }
         HomeUiState(
             instances = instances,
@@ -94,6 +103,7 @@ class InstanceListViewModel @Inject constructor(
                 hasCurrentInstance = currentInstance != null,
                 session = currentSession,
             ),
+            recentPaths = recentPaths,
             taskSummary = taskSummary,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
@@ -137,5 +147,9 @@ class InstanceListViewModel @Inject constructor(
             }
             _connectionStatus.update { it + (instance.id to status) }
         }
+    }
+
+    private companion object {
+        const val HOME_RECENT_LIMIT = 3
     }
 }

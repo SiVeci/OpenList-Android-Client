@@ -3,11 +3,13 @@ package io.openlist.client.feature.instance
 import io.openlist.client.core.common.ApiResult
 import io.openlist.client.core.domain.AuthRepository
 import io.openlist.client.core.domain.InstanceRepository
+import io.openlist.client.core.domain.RecentPathRepository
 import io.openlist.client.core.domain.TaskAggregationRepository
 import io.openlist.client.core.model.AdminEntryVisibility
 import io.openlist.client.core.model.AuthType
 import io.openlist.client.core.model.Instance
 import io.openlist.client.core.model.LoginResult
+import io.openlist.client.core.model.RecentPath
 import io.openlist.client.core.model.Session
 import io.openlist.client.core.model.TaskSource
 import io.openlist.client.core.model.TaskType
@@ -50,7 +52,7 @@ class InstanceListViewModelTest {
         val instanceRepository = FakeInstanceRepository(emptyList())
         val authRepository = FakeAuthRepository(emptyList())
         val taskRepository = FakeTaskAggregationRepository()
-        val viewModel = InstanceListViewModel(instanceRepository, authRepository, taskRepository)
+        val viewModel = InstanceListViewModel(instanceRepository, authRepository, taskRepository, FakeRecentPathRepository())
         val job = launch { viewModel.homeUiState.collect {} }
 
         advanceUntilIdle()
@@ -79,7 +81,7 @@ class InstanceListViewModelTest {
                 task("done", "inst-1", UnifiedTaskStatus.SUCCESS),
             ),
         )
-        val viewModel = InstanceListViewModel(instanceRepository, authRepository, taskRepository)
+        val viewModel = InstanceListViewModel(instanceRepository, authRepository, taskRepository, FakeRecentPathRepository())
         val job = launch { viewModel.homeUiState.collect {} }
 
         advanceUntilIdle()
@@ -106,7 +108,7 @@ class InstanceListViewModelTest {
         val taskRepository = FakeTaskAggregationRepository(
             "guest-inst" to listOf(task("unknown", "guest-inst", UnifiedTaskStatus.UNKNOWN)),
         )
-        val viewModel = InstanceListViewModel(instanceRepository, authRepository, taskRepository)
+        val viewModel = InstanceListViewModel(instanceRepository, authRepository, taskRepository, FakeRecentPathRepository())
         val job = launch { viewModel.homeUiState.collect {} }
 
         advanceUntilIdle()
@@ -137,7 +139,7 @@ class InstanceListViewModelTest {
             "inst-1" to listOf(task("failed", "inst-1", UnifiedTaskStatus.FAILED)),
             "inst-2" to listOf(task("pending", "inst-2", UnifiedTaskStatus.PENDING)),
         )
-        val viewModel = InstanceListViewModel(instanceRepository, authRepository, taskRepository)
+        val viewModel = InstanceListViewModel(instanceRepository, authRepository, taskRepository, FakeRecentPathRepository())
         val job = launch { viewModel.homeUiState.collect {} }
 
         advanceUntilIdle()
@@ -160,6 +162,37 @@ class InstanceListViewModelTest {
         advanceUntilIdle()
         assertEquals(listOf("inst-1", "inst-2"), taskRepository.downloadRefreshes)
         assertEquals(listOf("inst-1", "inst-2"), taskRepository.remoteRefreshes)
+
+        job.cancel()
+    }
+
+    @Test
+    fun `home state exposes the three most recent paths across instances`() = runTest {
+        val instanceRepository = FakeInstanceRepository(
+            listOf(
+                instance("inst-1", isCurrent = true),
+                instance("inst-2", isCurrent = false),
+            ),
+        )
+        val authRepository = FakeAuthRepository(emptyList())
+        val taskRepository = FakeTaskAggregationRepository()
+        val recentRepository = FakeRecentPathRepository(
+            listOf(
+                recent("inst-2", "/photos", 40),
+                recent("inst-1", "/docs", 30),
+                recent("inst-2", "/music", 20),
+                recent("inst-1", "/archive", 10),
+            ),
+        )
+        val viewModel = InstanceListViewModel(instanceRepository, authRepository, taskRepository, recentRepository)
+        val job = launch { viewModel.homeUiState.collect {} }
+
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf("/photos", "/docs", "/music"),
+            viewModel.homeUiState.value.recentPaths.map { it.path },
+        )
 
         job.cancel()
     }
@@ -252,6 +285,23 @@ class InstanceListViewModelTest {
         }
     }
 
+    private class FakeRecentPathRepository(initialRecents: List<RecentPath> = emptyList()) : RecentPathRepository {
+        private val recents = MutableStateFlow(initialRecents)
+
+        override fun observeByInstance(instanceId: String): Flow<List<RecentPath>> =
+            recents.map { list -> list.filter { it.instanceId == instanceId } }
+
+        override fun observeAll(): Flow<List<RecentPath>> = recents
+
+        override suspend fun recordPath(instanceId: String, path: String, displayName: String?) {
+            error("Not used in InstanceListViewModelTest")
+        }
+
+        override suspend fun deleteByInstanceId(instanceId: String) {
+            recents.value = recents.value.filterNot { it.instanceId == instanceId }
+        }
+    }
+
     private companion object {
         fun instance(id: String, isCurrent: Boolean) = Instance(
             id = id,
@@ -292,6 +342,13 @@ class InstanceListViewModelTest {
             errorMessage = null,
             createdAt = 0L,
             updatedAt = 0L,
+        )
+
+        fun recent(instanceId: String, path: String, visitedAt: Long) = RecentPath(
+            instanceId = instanceId,
+            path = path,
+            displayName = path.substringAfterLast('/').ifBlank { "/" },
+            visitedAt = visitedAt,
         )
     }
 }

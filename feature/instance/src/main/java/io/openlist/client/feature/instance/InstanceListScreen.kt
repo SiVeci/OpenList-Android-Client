@@ -67,8 +67,10 @@ import io.openlist.client.core.designsystem.components.StatusSummaryStrip
 import io.openlist.client.core.designsystem.components.StatusTone
 import io.openlist.client.core.model.AdminEntryVisibility
 import io.openlist.client.core.model.Instance
+import io.openlist.client.core.model.RecentPath
 import io.openlist.client.core.model.Session
 import io.openlist.client.core.model.TaskSummary
+import java.util.Calendar
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -80,6 +82,7 @@ fun InstanceListScreen(
     onOpenInstance: (instanceId: String) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenFiles: (instanceId: String) -> Unit = onOpenInstance,
+    onOpenRecentPath: (instanceId: String, path: String) -> Unit = { instanceId, _ -> onOpenFiles(instanceId) },
     onOpenSearch: (instanceId: String) -> Unit = {},
     onOpenTaskCenter: (instanceId: String) -> Unit = {},
     onOpenShareList: (instanceId: String) -> Unit = {},
@@ -154,8 +157,9 @@ fun InstanceListScreen(
                 }
                 item {
                     HomeRecentSection(
-                        currentInstance = homeUiState.currentInstance,
-                        onOpenFiles = onOpenFiles,
+                        recentPaths = homeUiState.recentPaths,
+                        instanceNamesById = instances.associate { it.id to it.name },
+                        onOpenRecentPath = onOpenRecentPath,
                         modifier = Modifier.padding(horizontal = Spacing.md),
                     )
                 }
@@ -480,56 +484,103 @@ private fun InstanceSwitcherRow(
 
 @Composable
 private fun HomeRecentSection(
-    currentInstance: Instance?,
-    onOpenFiles: (instanceId: String) -> Unit,
+    recentPaths: List<RecentPath>,
+    instanceNamesById: Map<String, String>,
+    onOpenRecentPath: (instanceId: String, path: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
         SectionHeader(title = "继续浏览")
         GroupCard(modifier = Modifier.padding(top = Spacing.sm)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(enabled = currentInstance != null) {
-                        currentInstance?.let { onOpenFiles(it.id) }
-                    }
-                    .padding(vertical = Spacing.xs),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                Box(
+            if (recentPaths.isEmpty()) {
+                Text(
+                    text = "暂无最近访问记录，进入文件页后会自动记录。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
-                        .size(52.dp)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), MaterialTheme.shapes.large),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Folder,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "根目录",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = currentInstance?.name ?: "选择实例后可用",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        .fillMaxWidth()
+                        .padding(vertical = Spacing.sm),
                 )
+            } else {
+                recentPaths.forEachIndexed { index, recentPath ->
+                    RecentPathRow(
+                        recentPath = recentPath,
+                        instanceName = instanceNamesById[recentPath.instanceId] ?: "OpenList",
+                        onClick = { onOpenRecentPath(recentPath.instanceId, recentPath.path) },
+                    )
+                    if (index != recentPaths.lastIndex) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    }
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun RecentPathRow(
+    recentPath: RecentPath,
+    instanceName: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), MaterialTheme.shapes.large),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Folder,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = recentPath.path,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = "${formatRecentVisitedAt(recentPath.visitedAt)} 访问",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        StatusBadge(
+            text = instanceName,
+            tone = StatusTone.PRIMARY,
+        )
+        Icon(
+            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private fun formatRecentVisitedAt(epochMillis: Long): String {
+    val now = Calendar.getInstance()
+    val visited = Calendar.getInstance().apply { timeInMillis = epochMillis }
+    val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(epochMillis))
+    return when {
+        now.get(Calendar.YEAR) == visited.get(Calendar.YEAR) &&
+            now.get(Calendar.DAY_OF_YEAR) == visited.get(Calendar.DAY_OF_YEAR) -> "今天 $time"
+        now.get(Calendar.YEAR) == visited.get(Calendar.YEAR) &&
+            now.get(Calendar.DAY_OF_YEAR) - visited.get(Calendar.DAY_OF_YEAR) == 1 -> "昨天 $time"
+        else -> SimpleDateFormat("M月d日 HH:mm", Locale.getDefault()).format(Date(epochMillis))
     }
 }
 
