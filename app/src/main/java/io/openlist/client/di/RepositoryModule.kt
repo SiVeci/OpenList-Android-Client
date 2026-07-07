@@ -20,6 +20,7 @@ import io.openlist.client.core.domain.InstanceRepository
 import io.openlist.client.core.domain.MediaRepository
 import io.openlist.client.core.domain.OfflineDownloadRepository
 import io.openlist.client.core.domain.PreviewRepository
+import io.openlist.client.core.domain.RecentPathRepository
 import io.openlist.client.core.domain.SearchRepository
 import io.openlist.client.core.domain.ShareRepository
 import io.openlist.client.core.domain.SubtitleRepository
@@ -45,6 +46,7 @@ import io.openlist.client.data.repository.MediaRepositoryImpl
 import io.openlist.client.data.repository.MimeTypeResolver
 import io.openlist.client.data.repository.OfflineDownloadRepositoryImpl
 import io.openlist.client.data.repository.PreviewRepositoryImpl
+import io.openlist.client.data.repository.RecentPathRepositoryImpl
 import io.openlist.client.data.repository.SearchRepositoryImpl
 import io.openlist.client.data.repository.ShareRepositoryImpl
 import io.openlist.client.data.repository.SubtitleRepositoryImpl
@@ -92,6 +94,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindSearchRepository(impl: SearchRepositoryImpl): SearchRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindRecentPathRepository(impl: RecentPathRepositoryImpl): RecentPathRepository
 
     @Binds
     @Singleton
