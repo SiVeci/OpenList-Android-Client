@@ -47,6 +47,16 @@ data class TaskGroup(
     val title: String get() = "${type.title} (${tasks.size})"
 }
 
+enum class TaskGroupActionType { CANCEL_ACTIVE, CLEAR_FAILED, CLEAR_FINISHED }
+
+data class TaskGroupActionConfirm(
+    val type: TaskGroupActionType,
+    val source: TaskSource?,
+    val tasks: List<UnifiedTask>,
+) {
+    val count: Int get() = tasks.size
+}
+
 data class OfflineDownloadUiState(
     val url: String = "",
     val targetDir: String = "/",
@@ -65,6 +75,8 @@ data class TaskCenterUiState(
     val remoteErrorMessage: String? = null,
     val cancelConfirmTarget: UnifiedTask? = null,
     val cancelling: Boolean = false,
+    val groupActionConfirm: TaskGroupActionConfirm? = null,
+    val groupActionLoading: Boolean = false,
     val offlineDownload: OfflineDownloadUiState? = null,
     val snackbarMessage: String? = null,
 ) {
@@ -180,6 +192,65 @@ class TaskCenterViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    fun openGroupActionConfirm(groupType: TaskGroupType) {
+        val state = _uiState.value
+        val group = state.taskGroups.firstOrNull { it.type == groupType } ?: return
+        val actionType = when (groupType) {
+            TaskGroupType.RUNNING -> TaskGroupActionType.CANCEL_ACTIVE
+            TaskGroupType.FAILED -> TaskGroupActionType.CLEAR_FAILED
+            TaskGroupType.COMPLETED -> TaskGroupActionType.CLEAR_FINISHED
+        }
+        _uiState.update {
+            it.copy(
+                groupActionConfirm = TaskGroupActionConfirm(
+                    type = actionType,
+                    source = state.selectedTab.sourceOrNull(),
+                    tasks = group.tasks,
+                ),
+            )
+        }
+    }
+
+    fun dismissGroupActionConfirm() {
+        if (_uiState.value.groupActionLoading) return
+        _uiState.update { it.copy(groupActionConfirm = null) }
+    }
+
+    fun confirmGroupAction() {
+        val confirm = _uiState.value.groupActionConfirm ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(groupActionLoading = true) }
+            val result = when (confirm.type) {
+                TaskGroupActionType.CANCEL_ACTIVE -> cancelActiveTasks(confirm.tasks)
+                TaskGroupActionType.CLEAR_FAILED -> taskAggregationRepository.clearFailedTasks(instanceId, confirm.source)
+                TaskGroupActionType.CLEAR_FINISHED -> confirm.source?.let { source ->
+                    taskAggregationRepository.clearFinishedTasks(instanceId, source)
+                } ?: ApiResult.Success(Unit)
+            }
+            _uiState.update {
+                it.copy(
+                    groupActionLoading = false,
+                    groupActionConfirm = null,
+                    snackbarMessage = when (result) {
+                        is ApiResult.Success -> confirm.successMessage()
+                        is ApiResult.Failure -> result.error.toUserMessage()
+                    },
+                )
+            }
+        }
+    }
+
+    private suspend fun cancelActiveTasks(tasks: List<UnifiedTask>): ApiResult<Unit> {
+        var firstFailure: ApiResult.Failure? = null
+        tasks.forEach { task ->
+            when (val result = taskAggregationRepository.cancelTask(instanceId, task.id, task.source)) {
+                is ApiResult.Success -> Unit
+                is ApiResult.Failure -> if (firstFailure == null) firstFailure = result
+            }
+        }
+        return firstFailure ?: ApiResult.Success(Unit)
     }
 
     fun dismissSnackbar() {
@@ -332,4 +403,17 @@ class TaskCenterViewModel @Inject constructor(
     private companion object {
         const val POLL_INTERVAL_MS = 4_000L
     }
+}
+
+private fun TaskTab.sourceOrNull(): TaskSource? = when (this) {
+    TaskTab.UPLOAD -> TaskSource.LOCAL_UPLOAD
+    TaskTab.DOWNLOAD -> TaskSource.LOCAL_DOWNLOAD
+    TaskTab.REMOTE -> TaskSource.REMOTE
+    TaskTab.FAILED -> null
+}
+
+private fun TaskGroupActionConfirm.successMessage(): String = when (type) {
+    TaskGroupActionType.CANCEL_ACTIVE -> "已取消 $count 个任务"
+    TaskGroupActionType.CLEAR_FAILED -> "已清除失败任务"
+    TaskGroupActionType.CLEAR_FINISHED -> "已清除已完成任务"
 }

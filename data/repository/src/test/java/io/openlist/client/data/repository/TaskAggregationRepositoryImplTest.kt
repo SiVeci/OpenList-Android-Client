@@ -145,6 +145,29 @@ class TaskAggregationRepositoryImplTest {
         coVerify { remoteTaskDao.deleteFinishedByInstanceId(INSTANCE_ID) }
     }
 
+    @Test
+    fun `clearFailedTasks LOCAL_UPLOAD forwards to UploadRepository`() = runTest {
+        coEvery { uploadRepository.clearFailed(INSTANCE_ID) } returns ApiResult.Success(Unit)
+
+        val result = repository.clearFailedTasks(INSTANCE_ID, TaskSource.LOCAL_UPLOAD)
+
+        assertEquals(ApiResult.Success(Unit), result)
+    }
+
+    @Test
+    fun `clearFailedTasks null source clears all local and remote failed rows`() = runTest {
+        coEvery { uploadRepository.clearFailed(INSTANCE_ID) } returns ApiResult.Success(Unit)
+        coEvery { transferRepository.clearFailed(INSTANCE_ID) } returns ApiResult.Success(Unit)
+        coEvery { remoteTaskDao.deleteFailedByInstanceId(INSTANCE_ID) } returns Unit
+
+        val result = repository.clearFailedTasks(INSTANCE_ID, null)
+
+        assertEquals(ApiResult.Success(Unit), result)
+        coVerify { uploadRepository.clearFailed(INSTANCE_ID) }
+        coVerify { transferRepository.clearFailed(INSTANCE_ID) }
+        coVerify { remoteTaskDao.deleteFailedByInstanceId(INSTANCE_ID) }
+    }
+
     private fun remoteTask() = RemoteTaskEntity(
         id = TASK_ID,
         instanceId = INSTANCE_ID,

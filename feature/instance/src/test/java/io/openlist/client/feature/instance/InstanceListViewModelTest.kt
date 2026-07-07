@@ -291,6 +291,10 @@ class InstanceListViewModelTest {
         override suspend fun clearFinishedTasks(instanceId: String, source: TaskSource): ApiResult<Unit> {
             error("Not used in InstanceListViewModelTest")
         }
+
+        override suspend fun clearFailedTasks(instanceId: String, source: TaskSource?): ApiResult<Unit> {
+            error("Not used in InstanceListViewModelTest")
+        }
     }
 
     private class FakeRecentPathRepository(initialRecents: List<RecentPath> = emptyList()) : RecentPathRepository {

@@ -37,6 +37,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -44,6 +45,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -140,7 +142,11 @@ fun TaskCenterScreen(
                         }
                         groups.forEach { group ->
                             item(key = "group-${group.type}") {
-                                TaskGroupHeader(title = group.title)
+                                TaskGroupHeader(
+                                    title = group.title,
+                                    actionLabel = group.type.actionLabel(),
+                                    onAction = { viewModel.openGroupActionConfirm(group.type) },
+                                )
                             }
                             items(group.tasks, key = { it.id }) { task ->
                                 TaskRow(
@@ -166,6 +172,18 @@ fun TaskCenterScreen(
             confirmText = "取消任务",
             danger = true,
             loading = uiState.cancelling,
+        )
+    }
+
+    uiState.groupActionConfirm?.let { confirm ->
+        ConfirmDialog(
+            title = confirm.dialogTitle(),
+            message = confirm.dialogMessage(),
+            onConfirm = { viewModel.confirmGroupAction() },
+            onDismiss = { viewModel.dismissGroupActionConfirm() },
+            confirmText = confirm.confirmText(),
+            danger = confirm.type != TaskGroupActionType.CLEAR_FINISHED,
+            loading = uiState.groupActionLoading,
         )
     }
 
@@ -241,13 +259,51 @@ private fun TaskSummaryDivider() {
 }
 
 @Composable
-private fun TaskGroupHeader(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.padding(top = Spacing.sm),
-    )
+private fun TaskGroupHeader(
+    title: String,
+    actionLabel: String,
+    onAction: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = Spacing.sm),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        TextButton(onClick = onAction) {
+            Text(actionLabel)
+        }
+    }
+}
+
+private fun TaskGroupType.actionLabel(): String = when (this) {
+    TaskGroupType.RUNNING -> "全部取消"
+    TaskGroupType.FAILED -> "清除失败"
+    TaskGroupType.COMPLETED -> "清除已完成"
+}
+
+private fun TaskGroupActionConfirm.dialogTitle(): String = when (type) {
+    TaskGroupActionType.CANCEL_ACTIVE -> "取消运行中任务"
+    TaskGroupActionType.CLEAR_FAILED -> "清除失败任务"
+    TaskGroupActionType.CLEAR_FINISHED -> "清除已完成任务"
+}
+
+private fun TaskGroupActionConfirm.dialogMessage(): String = when (type) {
+    TaskGroupActionType.CANCEL_ACTIVE -> "确定取消当前分组中的 $count 个运行中任务吗？"
+    TaskGroupActionType.CLEAR_FAILED -> "确定清除当前范围内的失败任务吗？"
+    TaskGroupActionType.CLEAR_FINISHED -> "确定清除当前范围内的已完成任务吗？"
+}
+
+private fun TaskGroupActionConfirm.confirmText(): String = when (type) {
+    TaskGroupActionType.CANCEL_ACTIVE -> "全部取消"
+    TaskGroupActionType.CLEAR_FAILED -> "清除失败"
+    TaskGroupActionType.CLEAR_FINISHED -> "清除已完成"
 }
 
 @Composable

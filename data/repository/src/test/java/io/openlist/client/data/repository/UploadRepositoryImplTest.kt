@@ -96,6 +96,14 @@ class UploadRepositoryImplTest {
         coVerify { uploadTaskDao.deleteFinishedByInstanceId(INSTANCE_ID) }
     }
 
+    @Test
+    fun `clearFailed deletes failed uploads for the instance`() = runTest {
+        val result = repository.clearFailed(INSTANCE_ID)
+
+        assertEquals(ApiResult.Success(Unit), result)
+        coVerify { uploadTaskDao.deleteFailedByInstanceId(INSTANCE_ID) }
+    }
+
     private fun task(status: String) = UploadTaskEntity(
         id = TASK_ID,
         instanceId = "instance-1",

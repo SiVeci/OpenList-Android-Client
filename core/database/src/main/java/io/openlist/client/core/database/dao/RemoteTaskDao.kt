@@ -25,6 +25,9 @@ interface RemoteTaskDao {
     @Query("DELETE FROM remote_tasks WHERE instanceId = :instanceId AND status = 'SUCCESS'")
     suspend fun deleteFinishedByInstanceId(instanceId: String)
 
+    @Query("DELETE FROM remote_tasks WHERE instanceId = :instanceId AND status = 'FAILED'")
+    suspend fun deleteFailedByInstanceId(instanceId: String)
+
     /** Overwrites one task type's cached rows atomically (§18.3: "远程任务...
      * 刷新并 replaceByInstance") so tasks no longer returned by the backend
      * (e.g. purged history) don't linger locally. */

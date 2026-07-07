@@ -83,6 +83,14 @@ class TransferRepositoryImplTest {
         coVerify { downloadTaskDao.deleteFinishedByInstanceId(INSTANCE_ID) }
     }
 
+    @Test
+    fun `clearFailed deletes failed downloads for the instance`() = runTest {
+        val result = repository.clearFailed(INSTANCE_ID)
+
+        assertEquals(ApiResult.Success(Unit), result)
+        coVerify { downloadTaskDao.deleteFailedByInstanceId(INSTANCE_ID) }
+    }
+
     private fun task(status: String, managerId: Long? = 1L) = DownloadTaskEntity(
         id = TASK_ID,
         instanceId = "instance-1",

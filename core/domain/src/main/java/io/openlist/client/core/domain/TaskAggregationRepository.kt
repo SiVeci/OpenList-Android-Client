@@ -33,4 +33,6 @@ interface TaskAggregationRepository {
     suspend fun retryTask(instanceId: String, taskId: String, source: TaskSource): ApiResult<Unit>
 
     suspend fun clearFinishedTasks(instanceId: String, source: TaskSource): ApiResult<Unit>
+
+    suspend fun clearFailedTasks(instanceId: String, source: TaskSource?): ApiResult<Unit>
 }

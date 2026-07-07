@@ -80,6 +80,23 @@ class TaskAggregationRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun clearFailedTasks(instanceId: String, source: TaskSource?): ApiResult<Unit> {
+        return when (source) {
+            TaskSource.LOCAL_UPLOAD -> uploadRepository.clearFailed(instanceId)
+            TaskSource.LOCAL_DOWNLOAD -> transferRepository.clearFailed(instanceId)
+            TaskSource.REMOTE -> {
+                remoteTaskDao.deleteFailedByInstanceId(instanceId)
+                ApiResult.Success(Unit)
+            }
+            null -> {
+                uploadRepository.clearFailed(instanceId)
+                transferRepository.clearFailed(instanceId)
+                remoteTaskDao.deleteFailedByInstanceId(instanceId)
+                ApiResult.Success(Unit)
+            }
+        }
+    }
+
     private fun UnifiedTaskStatus.sortRank(): Int = when (this) {
         UnifiedTaskStatus.RUNNING -> 0
         UnifiedTaskStatus.PENDING -> 1

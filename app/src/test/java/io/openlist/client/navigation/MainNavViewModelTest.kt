@@ -171,6 +171,9 @@ class MainNavViewModelTest {
 
         override suspend fun clearFinishedTasks(instanceId: String, source: TaskSource): ApiResult<Unit> =
             error("not used")
+
+        override suspend fun clearFailedTasks(instanceId: String, source: TaskSource?): ApiResult<Unit> =
+            error("not used")
     }
 }
 

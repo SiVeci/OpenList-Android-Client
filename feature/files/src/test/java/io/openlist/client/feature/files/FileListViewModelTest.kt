@@ -309,6 +309,10 @@ class FileListViewModelTest {
         override suspend fun clearFinished(instanceId: String): ApiResult<Unit> {
             error("Not used in FileListViewModelTest")
         }
+
+        override suspend fun clearFailed(instanceId: String): ApiResult<Unit> {
+            error("Not used in FileListViewModelTest")
+        }
     }
 
     private class FakeShareRepository : ShareRepository {

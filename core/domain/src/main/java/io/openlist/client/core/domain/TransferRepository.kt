@@ -33,4 +33,6 @@ interface TransferRepository {
     suspend fun cancelDownload(taskId: String): ApiResult<Unit>
 
     suspend fun clearFinished(instanceId: String): ApiResult<Unit>
+
+    suspend fun clearFailed(instanceId: String): ApiResult<Unit>
 }
