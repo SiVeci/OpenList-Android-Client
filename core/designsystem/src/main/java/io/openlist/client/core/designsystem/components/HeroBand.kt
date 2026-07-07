@@ -5,6 +5,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -46,6 +47,21 @@ fun HeroHeader(
     subtitle: String? = null,
     onBack: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
+    content: @Composable ColumnScope.() -> Unit = {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineMedium,
+            color = OpenListPalette.OnDark,
+        )
+        if (subtitle != null) {
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = OpenListPalette.OnDarkMuted,
+                modifier = Modifier.padding(top = Spacing.xxs),
+            )
+        }
+    },
 ) {
     // The band is dark in both themes; force light status bar icons while it
     // is on screen and restore the previous appearance when it leaves.
@@ -87,19 +103,7 @@ fun HeroHeader(
                 }
             }
             Column(modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = OpenListPalette.OnDark,
-                )
-                if (subtitle != null) {
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = OpenListPalette.OnDarkMuted,
-                        modifier = Modifier.padding(top = Spacing.xxs),
-                    )
-                }
+                content()
             }
         }
     }
