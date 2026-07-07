@@ -9,6 +9,7 @@ import io.openlist.client.core.database.dao.DownloadTaskDao
 import io.openlist.client.core.database.dao.FileCacheDao
 import io.openlist.client.core.database.dao.InstanceDao
 import io.openlist.client.core.database.dao.PreviewCacheDao
+import io.openlist.client.core.database.dao.RecentPathDao
 import io.openlist.client.core.database.dao.RemoteTaskDao
 import io.openlist.client.core.database.dao.SearchHistoryDao
 import io.openlist.client.core.database.dao.SessionDao
@@ -39,6 +40,7 @@ class InstanceRepositoryImpl @Inject constructor(
     private val remoteTaskDao: RemoteTaskDao,
     private val previewCacheDao: PreviewCacheDao,
     private val adminCacheDao: AdminCacheDao,
+    private val recentPathDao: RecentPathDao,
     private val clientFactory: OpenListClientFactory,
     @ApplicationContext private val context: Context,
 ) : InstanceRepository {
@@ -95,6 +97,7 @@ class InstanceRepositoryImpl @Inject constructor(
         searchHistoryDao.deleteByInstanceId(id)
         remoteTaskDao.deleteByInstanceId(id)
         previewCacheDao.deleteByInstanceId(id)
+        recentPathDao.deleteByInstanceId(id)
         // v0.5 admin console cache (PRD §11.6/§17.2.8: "删除实例时清理管理缓存").
         adminCacheDao.deleteByInstanceId(id)
         // Preview content bodies live under cacheDir/preview/<instanceId>/, not

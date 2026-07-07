@@ -17,6 +17,7 @@ import io.openlist.client.core.domain.FileListResult
 import io.openlist.client.core.domain.FileOperationRepository
 import io.openlist.client.core.domain.FilesRepository
 import io.openlist.client.core.domain.InstanceRepository
+import io.openlist.client.core.domain.RecentPathRepository
 import io.openlist.client.core.domain.ShareRepository
 import io.openlist.client.core.domain.UploadRepository
 import io.openlist.client.core.model.BatchOperationFailure
@@ -124,6 +125,7 @@ class FileListViewModel @Inject constructor(
     private val directoryPickerRepository: DirectoryPickerRepository,
     private val uploadRepository: UploadRepository,
     private val shareRepository: ShareRepository,
+    private val recentPathRepository: RecentPathRepository,
 ) : ViewModel() {
 
     private val instanceId: String = checkNotNull(savedStateHandle["instanceId"])
@@ -151,6 +153,7 @@ class FileListViewModel @Inject constructor(
     fun navigateTo(path: String, forceRefresh: Boolean = false) {
         viewModelScope.launch {
             val normalized = OpenListPathCodec.normalize(path)
+            runCatching { recentPathRepository.recordPath(instanceId, normalized) }
             val isSamePath = _uiState.value.currentPath == normalized
             _uiState.update {
                 it.copy(
