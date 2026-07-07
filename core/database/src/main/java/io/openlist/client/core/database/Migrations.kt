@@ -172,3 +172,24 @@ val MIGRATION_8_9 = object : Migration(8, 9) {
         )
     }
 }
+
+/**
+ * Adds `recent_paths` for the v1.1 home workspace. This is the only v1.1
+ * schema change and deliberately does not alter any existing table.
+ */
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `recent_paths` (" +
+                "`instanceId` TEXT NOT NULL, " +
+                "`path` TEXT NOT NULL, " +
+                "`displayName` TEXT NOT NULL, " +
+                "`visitedAt` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`instanceId`, `path`))",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_recent_paths_instanceId_visitedAt` " +
+                "ON `recent_paths` (`instanceId`, `visitedAt`)",
+        )
+    }
+}
