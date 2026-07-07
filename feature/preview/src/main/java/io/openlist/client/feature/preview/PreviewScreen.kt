@@ -3,9 +3,14 @@ package io.openlist.client.feature.preview
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -17,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.openlist.client.core.common.DomainError
 import io.openlist.client.core.common.toUserMessage
+import io.openlist.client.core.designsystem.Spacing
 import io.openlist.client.core.designsystem.components.AppTopBar
 import io.openlist.client.core.designsystem.components.EmptyState
 import io.openlist.client.core.designsystem.components.ErrorBar
@@ -29,6 +35,9 @@ import io.openlist.client.core.model.ExternalOpenTarget
 import io.openlist.client.core.model.PreviewOpenMode
 import io.openlist.client.core.model.PreviewSource
 import io.openlist.client.core.model.PreviewTarget
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * Preview host page for the `preview/{instanceId}?path={path}` route
@@ -84,11 +93,14 @@ fun PreviewScaffold(
     val target = uiState.target
     Scaffold(
         topBar = {
-            AppTopBar(
-                title = target?.name ?: "预览",
-                subtitle = path,
-                onBack = onBack,
-            )
+            Column {
+                AppTopBar(
+                    title = target?.name ?: "预览",
+                    subtitle = path,
+                    onBack = onBack,
+                )
+                target?.let { PreviewMetaStrip(target = it) }
+            }
         },
     ) { padding ->
         when {
@@ -112,6 +124,22 @@ fun PreviewScaffold(
                 modifier = Modifier.padding(padding).fillMaxSize(),
             )
         }
+    }
+}
+
+@Composable
+private fun PreviewMetaStrip(target: PreviewTarget) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+    ) {
+        StatusBadge(text = target.kind.name.lowercase().replaceFirstChar { it.uppercase() }, tone = StatusTone.NEUTRAL)
+        StatusBadge(text = target.openMode.previewModeLabel(), tone = StatusTone.NEUTRAL)
+        target.size?.let { StatusBadge(text = formatPreviewSize(it), tone = StatusTone.NEUTRAL) }
+        target.modifiedAt?.let { StatusBadge(text = formatPreviewDate(it), tone = StatusTone.NEUTRAL) }
     }
 }
 
@@ -323,3 +351,26 @@ private fun openInBrowser(context: android.content.Context, target: ExternalOpen
         onError(DomainError.ExternalOpenUnavailable.toUserMessage())
     }
 }
+
+private fun PreviewOpenMode.previewModeLabel(): String = when (this) {
+    PreviewOpenMode.IN_APP_IMAGE,
+    PreviewOpenMode.IN_APP_TEXT,
+    PreviewOpenMode.IN_APP_MARKDOWN,
+    PreviewOpenMode.IN_APP_VIDEO,
+    PreviewOpenMode.IN_APP_AUDIO -> "应用内预览"
+    PreviewOpenMode.EXTERNAL_APP -> "外部应用"
+    PreviewOpenMode.DOWNLOAD -> "下载"
+    PreviewOpenMode.WEB -> "网页打开"
+    PreviewOpenMode.UNSUPPORTED -> "暂不支持"
+}
+
+private fun formatPreviewSize(bytes: Long): String {
+    if (bytes <= 0) return "0 B"
+    val units = arrayOf("B", "KB", "MB", "GB", "TB")
+    val digitGroup = (kotlin.math.ln(bytes.toDouble()) / kotlin.math.ln(1024.0)).toInt().coerceIn(0, units.lastIndex)
+    val value = bytes / Math.pow(1024.0, digitGroup.toDouble())
+    return if (digitGroup == 0) "$bytes ${units[0]}" else String.format(Locale.getDefault(), "%.1f %s", value, units[digitGroup])
+}
+
+private fun formatPreviewDate(epochMillis: Long): String =
+    SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(epochMillis))
