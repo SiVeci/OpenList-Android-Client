@@ -1,6 +1,7 @@
 package io.openlist.client.data.repository
 
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.openlist.client.core.auth.CryptoManager
@@ -173,6 +174,16 @@ class AuthRepositoryImplTest {
         val result = repository.loginWithToken(INSTANCE_ID, "admin-token")
 
         assertTrue(result is ApiResult.Success)
+    }
+
+    @Test
+    fun `logout invalidates local session without touching the network`() = runTest {
+        repository.logout(INSTANCE_ID)
+
+        coVerify(exactly = 1) { sessionManager.invalidate(INSTANCE_ID) }
+        coVerify(exactly = 0) { instanceRepository.getById(any()) }
+        coVerify(exactly = 0) { api.me() }
+        coVerify(exactly = 0) { api.meWithToken(any()) }
     }
 
     private fun userResp(username: String = "alice") = UserResp(
