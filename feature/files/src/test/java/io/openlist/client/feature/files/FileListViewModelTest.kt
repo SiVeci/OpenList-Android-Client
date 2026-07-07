@@ -203,6 +203,10 @@ class FileListViewModelTest {
         override suspend fun refreshCurrentUser(instanceId: String): ApiResult<Session> {
             error("Not used in FileListViewModelTest")
         }
+
+        override suspend fun logout(instanceId: String) {
+            error("Not used in FileListViewModelTest")
+        }
     }
 
     private class FakeFileOperationRepository : FileOperationRepository {

@@ -153,6 +153,10 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun logout(instanceId: String) {
+        sessionManager.invalidate(instanceId)
+    }
+
     /** Validates [token] directly (bypassing AuthInterceptor, which can only see
      * already-persisted tokens) before it is ever written to disk. */
     private suspend fun bootstrapSession(

@@ -255,6 +255,10 @@ class InstanceListViewModelTest {
         override suspend fun refreshCurrentUser(instanceId: String): ApiResult<Session> {
             error("Not used in InstanceListViewModelTest")
         }
+
+        override suspend fun logout(instanceId: String) {
+            error("Not used in InstanceListViewModelTest")
+        }
     }
 
     private class FakeTaskAggregationRepository(

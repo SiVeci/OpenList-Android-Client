@@ -52,4 +52,7 @@ interface AuthRepository {
      * session on 401.
      */
     suspend fun refreshCurrentUser(instanceId: String): ApiResult<Session>
+
+    /** Clears the local session for [instanceId] without calling the network. */
+    suspend fun logout(instanceId: String)
 }
