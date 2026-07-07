@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -88,6 +89,25 @@ class MainNavViewModelTest {
     }
 
     @Test
+    fun `enables current instance before task stream emits`() = runTest {
+        val viewModel = MainNavViewModel(
+            instanceRepository = FakeInstanceRepository(listOf(instance("inst-1", current = true))),
+            taskAggregationRepository = FakeTaskAggregationRepository(
+                tasksByInstance = mapOf("inst-1" to null),
+            ),
+        )
+        val job = launch { viewModel.uiState.collect {} }
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("inst-1", state.currentInstanceId)
+        assertTrue(state.hasInstances)
+        assertEquals(0, state.activeTaskCount)
+
+        job.cancel()
+    }
+
+    @Test
     fun `switches active task badge when current instance changes`() = runTest {
         val instanceRepository = FakeInstanceRepository(
             listOf(instance("inst-1", current = true), instance("inst-2")),
@@ -136,10 +156,10 @@ class MainNavViewModelTest {
     }
 
     private class FakeTaskAggregationRepository(
-        private val tasksByInstance: Map<String, List<UnifiedTask>> = emptyMap(),
+        private val tasksByInstance: Map<String, List<UnifiedTask>?> = emptyMap(),
     ) : TaskAggregationRepository {
         override fun observeAllTasks(instanceId: String): Flow<List<UnifiedTask>> =
-            flowOf(tasksByInstance[instanceId].orEmpty())
+            tasksByInstance[instanceId]?.let { flowOf(it) } ?: emptyFlow()
 
         override suspend fun refreshRemoteTasks(instanceId: String): ApiResult<Unit> = error("not used")
         override suspend fun refreshDownloadStatuses(instanceId: String) = error("not used")

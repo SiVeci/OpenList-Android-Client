@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 
@@ -43,6 +44,7 @@ class MainNavViewModel @Inject constructor(
             } else {
                 taskAggregationRepository.observeAllTasks(instanceId)
                     .map { tasks -> summarizeTasks(tasks).activeCount }
+                    .onStart { emit(0) }
             }
         }
 
