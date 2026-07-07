@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.ExpandMore
@@ -223,6 +225,104 @@ fun InstanceSwitcherChip(
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(18.dp),
         )
+    }
+}
+
+data class StatusSummaryMetric(
+    val label: String,
+    val value: String,
+    val icon: ImageVector,
+    val tone: StatusTone = StatusTone.NEUTRAL,
+)
+
+@Composable
+fun StatusSummaryStrip(
+    metrics: List<StatusSummaryMetric>,
+    modifier: Modifier = Modifier,
+) {
+    GroupCard(modifier = modifier) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            metrics.forEachIndexed { index, metric ->
+                SummaryMetricItem(metric = metric, modifier = Modifier.weight(1f))
+                if (index != metrics.lastIndex) {
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = Spacing.sm)
+                            .size(width = 1.dp, height = 28.dp)
+                            .background(MaterialTheme.colorScheme.outlineVariant),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CapabilityChips(
+    labels: List<String>,
+    modifier: Modifier = Modifier,
+    tone: StatusTone = StatusTone.NEUTRAL,
+) {
+    Row(
+        modifier = modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        labels.forEach { label ->
+            StatusBadge(text = label, tone = tone)
+        }
+    }
+}
+
+@Composable
+private fun SummaryMetricItem(
+    metric: StatusSummaryMetric,
+    modifier: Modifier = Modifier,
+) {
+    val colors = summaryColors(metric.tone)
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = metric.icon,
+            contentDescription = null,
+            tint = colors.content,
+            modifier = Modifier.size(22.dp),
+        )
+        Column(modifier = Modifier.padding(start = Spacing.xs)) {
+            Text(
+                text = metric.value,
+                style = MaterialTheme.typography.titleSmall,
+                color = colors.content,
+                maxLines = 1,
+            )
+            Text(
+                text = metric.label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun summaryColors(tone: StatusTone): PlateColors {
+    val extended = OpenListTheme.extendedColors
+    val scheme = MaterialTheme.colorScheme
+    return when (tone) {
+        StatusTone.SUCCESS -> PlateColors(extended.success.copy(alpha = 0.12f), extended.success)
+        StatusTone.WARNING, StatusTone.PENDING -> PlateColors(extended.warning.copy(alpha = 0.12f), extended.warning)
+        StatusTone.ERROR -> PlateColors(scheme.error.copy(alpha = 0.12f), scheme.error)
+        StatusTone.PRIMARY, StatusTone.RUNNING -> PlateColors(scheme.primary.copy(alpha = 0.12f), scheme.primary)
+        StatusTone.NEUTRAL -> PlateColors(scheme.surfaceVariant, scheme.onSurfaceVariant)
     }
 }
 
