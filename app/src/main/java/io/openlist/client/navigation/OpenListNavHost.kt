@@ -198,6 +198,7 @@ fun OpenListNavHost(navController: NavHostController = rememberNavController()) 
                 onOpenDirectory = { path -> navController.navigate(Routes.fileList(instanceId, path)) },
                 onOpenFile = { path -> navController.navigate(Routes.preview(instanceId, path)) },
                 onOpenFileDetail = { path -> navController.navigate(Routes.fileDetail(instanceId, path)) },
+                onOpenAdminIndex = { navController.navigate(Routes.admin(instanceId, "INDEX")) },
             )
         }
         composable(Routes.TASK_CENTER) { backStackEntry ->
