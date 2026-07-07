@@ -4,16 +4,21 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DriveFileMove
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.CloudSync
@@ -22,8 +27,10 @@ import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.FileCopy
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.UploadFile
@@ -52,11 +59,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import io.openlist.client.core.designsystem.Spacing
-import io.openlist.client.core.designsystem.components.AppTopBar
 import io.openlist.client.core.designsystem.components.BatchSelectionTopBar
 import io.openlist.client.core.designsystem.components.Breadcrumb
 import io.openlist.client.core.designsystem.components.ConfirmDialog
@@ -65,6 +74,7 @@ import io.openlist.client.core.designsystem.components.EmptyState
 import io.openlist.client.core.designsystem.components.ErrorBar
 import io.openlist.client.core.designsystem.components.FileActionItem
 import io.openlist.client.core.designsystem.components.FileActionSheet
+import io.openlist.client.core.designsystem.components.GroupCard
 import io.openlist.client.core.designsystem.components.ListRowItem
 import io.openlist.client.core.designsystem.components.LoadingState
 import io.openlist.client.core.designsystem.components.ShareFormSheet
@@ -131,70 +141,26 @@ fun FileListScreen(
                     onCopy = { viewModel.openBatchCopyPicker() },
                 )
             } else {
-                Column {
-                    AppTopBar(
-                        title = uiState.instanceName,
-                        onBack = onBackToInstances,
-                        actions = {
-                            IconButton(onClick = { onOpenSearch(uiState.currentPath) }) {
-                                Icon(Icons.Filled.Search, contentDescription = "搜索")
-                            }
-                            if (uiState.canWrite) {
-                                IconButton(onClick = onOpenShareList) {
-                                    Icon(Icons.Filled.Share, contentDescription = "我的分享")
-                                }
-                            }
-                            IconButton(onClick = onOpenTaskCenter) {
-                                if (uiState.hasActiveUploads) {
-                                    BadgedBox(badge = { Badge() }) {
-                                        Icon(Icons.Filled.Checklist, contentDescription = "任务中心")
-                                    }
-                                } else {
-                                    Icon(Icons.Filled.Checklist, contentDescription = "任务中心")
-                                }
-                            }
-                            if (uiState.uploadTasks.isNotEmpty()) {
-                                IconButton(onClick = { viewModel.openUploadPanel() }) {
-                                    if (uiState.hasActiveUploads) {
-                                        BadgedBox(badge = { Badge() }) {
-                                            Icon(Icons.Filled.CloudSync, contentDescription = "上传进度")
-                                        }
-                                    } else {
-                                        Icon(Icons.Filled.CloudSync, contentDescription = "上传进度")
-                                    }
-                                }
-                            }
-                            if (uiState.canWrite) {
-                                IconButton(onClick = { uploadPickerLauncher.launch(arrayOf("*/*")) }) {
-                                    Icon(Icons.Filled.UploadFile, contentDescription = "上传")
-                                }
-                                IconButton(onClick = { viewModel.openNewFolderDialog() }) {
-                                    Icon(Icons.Filled.CreateNewFolder, contentDescription = "新建目录")
-                                }
-                            }
-                        },
-                    )
-                    Breadcrumb(
-                        segments = listOf("根目录") + OpenListPathCodec.segments(uiState.currentPath),
-                        onSegmentClick = { index -> viewModel.navigateToSegmentCount(index) },
-                    )
-                }
+                FileListHeader(
+                    uiState = uiState,
+                    onBack = onBackToInstances,
+                    onOpenSearch = { onOpenSearch(uiState.currentPath) },
+                    onOpenShareList = onOpenShareList,
+                    onOpenTaskCenter = onOpenTaskCenter,
+                    onOpenUploadPanel = { viewModel.openUploadPanel() },
+                    onUpload = { uploadPickerLauncher.launch(arrayOf("*/*")) },
+                    onNewFolder = { viewModel.openNewFolderDialog() },
+                    onSegmentClick = { index -> viewModel.navigateToSegmentCount(index) },
+                )
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-            if (uiState.fromCache) {
-                Text(
-                    text = "当前为本地缓存数据",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(horizontal = Spacing.md, vertical = Spacing.xs),
-                )
-            }
+            FileListRefreshStrip(
+                uiState = uiState,
+                onRefresh = { viewModel.refresh() },
+            )
             uiState.errorMessage?.let { message ->
                 ErrorBar(message = message, onRetry = { viewModel.refresh() })
             }
@@ -365,6 +331,142 @@ fun FileListScreen(
         )
         null -> Unit
     }
+}
+
+@Composable
+private fun FileListHeader(
+    uiState: FileListUiState,
+    onBack: () -> Unit,
+    onOpenSearch: () -> Unit,
+    onOpenShareList: () -> Unit,
+    onOpenTaskCenter: () -> Unit,
+    onOpenUploadPanel: () -> Unit,
+    onUpload: () -> Unit,
+    onNewFolder: () -> Unit,
+    onSegmentClick: (Int) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回实例")
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = uiState.instanceName.ifBlank { "OpenList" },
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = if (uiState.isGuest) "游客访问" else "已登录",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            IconButton(onClick = onOpenSearch) {
+                Icon(Icons.Filled.Search, contentDescription = "搜索")
+            }
+            if (uiState.canWrite) {
+                IconButton(onClick = onOpenShareList) {
+                    Icon(Icons.Filled.Share, contentDescription = "我的分享")
+                }
+            }
+            IconButton(onClick = onOpenTaskCenter) {
+                if (uiState.hasActiveUploads) {
+                    BadgedBox(badge = { Badge() }) {
+                        Icon(Icons.Filled.Checklist, contentDescription = "任务中心")
+                    }
+                } else {
+                    Icon(Icons.Filled.Checklist, contentDescription = "任务中心")
+                }
+            }
+            if (uiState.uploadTasks.isNotEmpty()) {
+                IconButton(onClick = onOpenUploadPanel) {
+                    if (uiState.hasActiveUploads) {
+                        BadgedBox(badge = { Badge() }) {
+                            Icon(Icons.Filled.CloudSync, contentDescription = "上传进度")
+                        }
+                    } else {
+                        Icon(Icons.Filled.CloudSync, contentDescription = "上传进度")
+                    }
+                }
+            }
+            if (uiState.canWrite) {
+                IconButton(onClick = onUpload) {
+                    Icon(Icons.Filled.UploadFile, contentDescription = "上传")
+                }
+                IconButton(onClick = onNewFolder) {
+                    Icon(Icons.Filled.CreateNewFolder, contentDescription = "新建目录")
+                }
+            }
+        }
+        GroupCard {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.FolderOpen,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp),
+                )
+                Breadcrumb(
+                    segments = listOf("根目录") + OpenListPathCodec.segments(uiState.currentPath),
+                    onSegmentClick = onSegmentClick,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FileListRefreshStrip(
+    uiState: FileListUiState,
+    onRefresh: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Refresh,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
+        )
+        Text(
+            text = refreshLabel(uiState),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        TextButton(onClick = onRefresh, enabled = !uiState.isRefreshing) {
+            Text(if (uiState.isRefreshing) "刷新中" else "刷新")
+        }
+    }
+}
+
+private fun refreshLabel(uiState: FileListUiState): String {
+    val timestamp = uiState.lastRefreshTimestampMillis ?: return if (uiState.fromCache) "当前为本地缓存数据" else "下拉或点按刷新"
+    val prefix = if (uiState.lastRefreshFromCache || uiState.fromCache) "缓存于" else "刚刚刷新"
+    return "$prefix ${formatDate(timestamp)}"
 }
 
 /** "下载" and "详情" both route to the file detail screen (v0.1's existing

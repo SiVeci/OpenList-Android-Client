@@ -70,6 +70,8 @@ data class FileListUiState(
     val instanceName: String = "",
     val currentPath: String = "/",
     val nodes: List<FileNode> = emptyList(),
+    val lastRefreshTimestampMillis: Long? = null,
+    val lastRefreshFromCache: Boolean = false,
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val fromCache: Boolean = false,
@@ -174,7 +176,14 @@ class FileListViewModel @Inject constructor(
             filesRepository.listDirectory(instanceId, normalized, forceRefresh).collect { result ->
                 when (result) {
                     is FileListResult.Cached -> _uiState.update {
-                        it.copy(nodes = result.nodes, fromCache = true, isLoading = false, directoryCapability = result.capability)
+                        it.copy(
+                            nodes = result.nodes,
+                            fromCache = true,
+                            lastRefreshTimestampMillis = result.cachedAt,
+                            lastRefreshFromCache = true,
+                            isLoading = false,
+                            directoryCapability = result.capability,
+                        )
                     }
                     is FileListResult.Fresh -> _uiState.update {
                         // S7-T3 audit: a fresh fetch can downgrade the
@@ -189,6 +198,8 @@ class FileListViewModel @Inject constructor(
                         it.copy(
                             nodes = result.nodes,
                             fromCache = false,
+                            lastRefreshTimestampMillis = System.currentTimeMillis(),
+                            lastRefreshFromCache = false,
                             isLoading = false,
                             isRefreshing = false,
                             errorMessage = null,
