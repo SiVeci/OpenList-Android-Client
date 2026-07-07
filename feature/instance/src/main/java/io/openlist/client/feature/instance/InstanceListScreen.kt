@@ -61,10 +61,13 @@ import io.openlist.client.core.designsystem.components.QuickActionTile
 import io.openlist.client.core.designsystem.components.SectionHeader
 import io.openlist.client.core.designsystem.components.SheetHeader
 import io.openlist.client.core.designsystem.components.StatusBadge
+import io.openlist.client.core.designsystem.components.StatusSummaryMetric
+import io.openlist.client.core.designsystem.components.StatusSummaryStrip
 import io.openlist.client.core.designsystem.components.StatusTone
 import io.openlist.client.core.model.AdminEntryVisibility
 import io.openlist.client.core.model.Instance
 import io.openlist.client.core.model.Session
+import io.openlist.client.core.model.TaskSummary
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -137,6 +140,14 @@ fun InstanceListScreen(
                         onOpenTaskCenter = onOpenTaskCenter,
                         onOpenShareList = onOpenShareList,
                         onOpenAdmin = onOpenAdmin,
+                        modifier = Modifier.padding(horizontal = Spacing.md),
+                    )
+                }
+                item {
+                    HomeTaskSummarySection(
+                        currentInstance = homeUiState.currentInstance,
+                        taskSummary = homeUiState.taskSummary,
+                        onOpenTaskCenter = onOpenTaskCenter,
                         modifier = Modifier.padding(horizontal = Spacing.md),
                     )
                 }
@@ -354,6 +365,53 @@ private fun RowScope.HomeActionTile(
         onClick = onClick,
         modifier = Modifier.weight(1f),
     )
+}
+
+@Composable
+private fun HomeTaskSummarySection(
+    currentInstance: Instance?,
+    taskSummary: TaskSummary,
+    onOpenTaskCenter: (instanceId: String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        SectionHeader(
+            title = "任务摘要",
+            actionText = "查看全部",
+            onActionClick = currentInstance?.let { instance ->
+                { onOpenTaskCenter(instance.id) }
+            },
+        )
+        StatusSummaryStrip(
+            metrics = listOf(
+                StatusSummaryMetric(
+                    label = "运行中",
+                    value = taskSummary.runningCount.toString(),
+                    icon = Icons.Outlined.Refresh,
+                    tone = StatusTone.RUNNING,
+                ),
+                StatusSummaryMetric(
+                    label = "待处理",
+                    value = taskSummary.pendingCount.toString(),
+                    icon = Icons.Outlined.TaskAlt,
+                    tone = StatusTone.PENDING,
+                ),
+                StatusSummaryMetric(
+                    label = "失败",
+                    value = taskSummary.failedCount.toString(),
+                    icon = Icons.Outlined.DeleteOutline,
+                    tone = StatusTone.ERROR,
+                ),
+                StatusSummaryMetric(
+                    label = "已完成",
+                    value = taskSummary.completedCount.toString(),
+                    icon = Icons.Outlined.CheckCircle,
+                    tone = StatusTone.SUCCESS,
+                ),
+            ),
+            modifier = Modifier.padding(top = Spacing.sm),
+        )
+    }
 }
 
 @Composable
