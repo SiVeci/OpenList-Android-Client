@@ -98,6 +98,11 @@ class TransferRepositoryImpl @Inject constructor(
         return ApiResult.Success(Unit)
     }
 
+    override suspend fun clearFinished(instanceId: String): ApiResult<Unit> {
+        downloadTaskDao.deleteFinishedByInstanceId(instanceId)
+        return ApiResult.Success(Unit)
+    }
+
     private data class CursorStatus(val status: String, val progress: Int?, val errorMessage: String?, val localUri: String?)
 
     private fun Cursor.toStatus(): CursorStatus {

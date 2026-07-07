@@ -101,6 +101,11 @@ class UploadRepositoryImpl @Inject constructor(
         return ApiResult.Success(Unit)
     }
 
+    override suspend fun clearFinished(instanceId: String): ApiResult<Unit> {
+        uploadTaskDao.deleteFinishedByInstanceId(instanceId)
+        return ApiResult.Success(Unit)
+    }
+
     private fun queryMetadata(uri: Uri): Triple<String?, Long?, String?> {
         var displayName: String? = null
         var size: Long? = null

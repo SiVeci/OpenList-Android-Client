@@ -168,6 +168,9 @@ class MainNavViewModelTest {
 
         override suspend fun retryTask(instanceId: String, taskId: String, source: TaskSource): ApiResult<Unit> =
             error("not used")
+
+        override suspend fun clearFinishedTasks(instanceId: String, source: TaskSource): ApiResult<Unit> =
+            error("not used")
     }
 }
 

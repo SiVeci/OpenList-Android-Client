@@ -31,4 +31,6 @@ interface TransferRepository {
      * if the task is already terminal (SUCCESS/FAILED/CANCELLED).
      */
     suspend fun cancelDownload(taskId: String): ApiResult<Unit>
+
+    suspend fun clearFinished(instanceId: String): ApiResult<Unit>
 }

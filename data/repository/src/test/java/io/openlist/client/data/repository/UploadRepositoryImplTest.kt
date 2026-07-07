@@ -88,6 +88,14 @@ class UploadRepositoryImplTest {
         coVerify { uploadTaskDao.setWorkRequestId(TASK_ID, any()) }
     }
 
+    @Test
+    fun `clearFinished deletes successful uploads for the instance`() = runTest {
+        val result = repository.clearFinished(INSTANCE_ID)
+
+        assertEquals(ApiResult.Success(Unit), result)
+        coVerify { uploadTaskDao.deleteFinishedByInstanceId(INSTANCE_ID) }
+    }
+
     private fun task(status: String) = UploadTaskEntity(
         id = TASK_ID,
         instanceId = "instance-1",
@@ -106,6 +114,7 @@ class UploadRepositoryImplTest {
     )
 
     private companion object {
+        const val INSTANCE_ID = "instance-1"
         const val TASK_ID = "task-1"
     }
 }

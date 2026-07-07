@@ -28,4 +28,6 @@ interface UploadRepository {
      * (v1.0_EXECUTION_PLAN.md V-605).
      */
     suspend fun retryUpload(taskId: String): ApiResult<Unit>
+
+    suspend fun clearFinished(instanceId: String): ApiResult<Unit>
 }

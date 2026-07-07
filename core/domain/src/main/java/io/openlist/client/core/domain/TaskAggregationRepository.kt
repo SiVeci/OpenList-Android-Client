@@ -31,4 +31,6 @@ interface TaskAggregationRepository {
      * [cancelTask]'s LOCAL_DOWNLOAD branch was handled before v1.0.
      */
     suspend fun retryTask(instanceId: String, taskId: String, source: TaskSource): ApiResult<Unit>
+
+    suspend fun clearFinishedTasks(instanceId: String, source: TaskSource): ApiResult<Unit>
 }

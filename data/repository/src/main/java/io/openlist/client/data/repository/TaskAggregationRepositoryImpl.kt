@@ -71,6 +71,15 @@ class TaskAggregationRepositoryImpl @Inject constructor(
         TaskSource.REMOTE -> ApiResult.Failure(DomainError.OpenListError(code = null, message = "暂不支持重试远程任务"))
     }
 
+    override suspend fun clearFinishedTasks(instanceId: String, source: TaskSource): ApiResult<Unit> = when (source) {
+        TaskSource.LOCAL_UPLOAD -> uploadRepository.clearFinished(instanceId)
+        TaskSource.LOCAL_DOWNLOAD -> transferRepository.clearFinished(instanceId)
+        TaskSource.REMOTE -> {
+            remoteTaskDao.deleteFinishedByInstanceId(instanceId)
+            ApiResult.Success(Unit)
+        }
+    }
+
     private fun UnifiedTaskStatus.sortRank(): Int = when (this) {
         UnifiedTaskStatus.RUNNING -> 0
         UnifiedTaskStatus.PENDING -> 1

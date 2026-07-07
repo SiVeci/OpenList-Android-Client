@@ -29,6 +29,9 @@ interface DownloadTaskDao {
     )
     suspend fun updateStatus(id: String, status: String, progress: Int?, errorMessage: String?, localUri: String?, updatedAt: Long)
 
+    @Query("DELETE FROM download_tasks WHERE instanceId = :instanceId AND status = 'SUCCESS'")
+    suspend fun deleteFinishedByInstanceId(instanceId: String)
+
     @Query("DELETE FROM download_tasks WHERE instanceId = :instanceId")
     suspend fun deleteByInstanceId(instanceId: String)
 }

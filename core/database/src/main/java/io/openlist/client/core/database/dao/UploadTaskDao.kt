@@ -24,6 +24,9 @@ interface UploadTaskDao {
     @Query("UPDATE upload_tasks SET workRequestId = :workRequestId WHERE id = :id")
     suspend fun setWorkRequestId(id: String, workRequestId: String)
 
+    @Query("DELETE FROM upload_tasks WHERE instanceId = :instanceId AND status = 'SUCCESS'")
+    suspend fun deleteFinishedByInstanceId(instanceId: String)
+
     @Query("DELETE FROM upload_tasks WHERE instanceId = :instanceId")
     suspend fun deleteByInstanceId(instanceId: String)
 }

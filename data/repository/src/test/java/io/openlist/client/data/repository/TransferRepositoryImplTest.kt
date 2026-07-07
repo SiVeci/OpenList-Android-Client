@@ -75,6 +75,14 @@ class TransferRepositoryImplTest {
         assertEquals(ApiResult.Success(Unit), result)
     }
 
+    @Test
+    fun `clearFinished deletes successful downloads for the instance`() = runTest {
+        val result = repository.clearFinished(INSTANCE_ID)
+
+        assertEquals(ApiResult.Success(Unit), result)
+        coVerify { downloadTaskDao.deleteFinishedByInstanceId(INSTANCE_ID) }
+    }
+
     private fun task(status: String, managerId: Long? = 1L) = DownloadTaskEntity(
         id = TASK_ID,
         instanceId = "instance-1",
@@ -91,6 +99,7 @@ class TransferRepositoryImplTest {
     )
 
     private companion object {
+        const val INSTANCE_ID = "instance-1"
         const val TASK_ID = "task-1"
     }
 }

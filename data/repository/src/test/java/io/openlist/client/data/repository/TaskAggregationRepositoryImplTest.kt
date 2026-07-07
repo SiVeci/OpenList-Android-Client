@@ -1,6 +1,7 @@
 package io.openlist.client.data.repository
 
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.openlist.client.core.common.ApiResult
@@ -112,6 +113,36 @@ class TaskAggregationRepositoryImplTest {
         val result = repository.retryTask(INSTANCE_ID, TASK_ID, TaskSource.REMOTE) as ApiResult.Failure
 
         assertTrue(result.error is DomainError.OpenListError)
+    }
+
+    // --- clearFinishedTasks -------------------------------------------------
+
+    @Test
+    fun `clearFinishedTasks LOCAL_UPLOAD forwards to UploadRepository`() = runTest {
+        coEvery { uploadRepository.clearFinished(INSTANCE_ID) } returns ApiResult.Success(Unit)
+
+        val result = repository.clearFinishedTasks(INSTANCE_ID, TaskSource.LOCAL_UPLOAD)
+
+        assertEquals(ApiResult.Success(Unit), result)
+    }
+
+    @Test
+    fun `clearFinishedTasks LOCAL_DOWNLOAD forwards to TransferRepository`() = runTest {
+        coEvery { transferRepository.clearFinished(INSTANCE_ID) } returns ApiResult.Success(Unit)
+
+        val result = repository.clearFinishedTasks(INSTANCE_ID, TaskSource.LOCAL_DOWNLOAD)
+
+        assertEquals(ApiResult.Success(Unit), result)
+    }
+
+    @Test
+    fun `clearFinishedTasks REMOTE clears successful remote cache rows`() = runTest {
+        coEvery { remoteTaskDao.deleteFinishedByInstanceId(INSTANCE_ID) } returns Unit
+
+        val result = repository.clearFinishedTasks(INSTANCE_ID, TaskSource.REMOTE)
+
+        assertEquals(ApiResult.Success(Unit), result)
+        coVerify { remoteTaskDao.deleteFinishedByInstanceId(INSTANCE_ID) }
     }
 
     private fun remoteTask() = RemoteTaskEntity(
