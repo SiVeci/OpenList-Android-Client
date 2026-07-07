@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -152,26 +153,19 @@ fun InstanceListScreen(
                     )
                 }
                 item {
-                    SectionHeader(
-                        title = "我的实例",
-                        actionText = "添加",
-                        onActionClick = onAddInstance,
-                        modifier = Modifier.padding(horizontal = Spacing.md),
-                    )
-                }
-                items(instances, key = { it.id }) { instance ->
-                    InstanceRow(
-                        instance = instance,
-                        session = sessionsByInstanceId[instance.id],
-                        connectionCheck = connectionStatus[instance.id],
-                        onClick = {
+                    HomeInstancesSection(
+                        instances = instances,
+                        sessionsByInstanceId = sessionsByInstanceId,
+                        connectionStatus = connectionStatus,
+                        onAddInstance = onAddInstance,
+                        onOpenInstance = { instance ->
                             viewModel.selectInstance(instance)
                             onOpenInstance(instance.id)
                         },
-                        onTestConnection = { viewModel.testConnection(instance) },
-                        onDelete = { pendingDelete = instance },
+                        onTestConnection = viewModel::testConnection,
+                        onDelete = { pendingDelete = it },
+                        modifier = Modifier.padding(horizontal = Spacing.md),
                     )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
         }
@@ -478,6 +472,41 @@ private fun InstanceSwitcherRow(
 }
 
 @Composable
+private fun HomeInstancesSection(
+    instances: List<Instance>,
+    sessionsByInstanceId: Map<String, Session>,
+    connectionStatus: Map<String, ConnectionCheck>,
+    onAddInstance: () -> Unit,
+    onOpenInstance: (Instance) -> Unit,
+    onTestConnection: (Instance) -> Unit,
+    onDelete: (Instance) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        SectionHeader(
+            title = "我的实例",
+            actionText = "添加",
+            onActionClick = onAddInstance,
+        )
+        GroupCard(modifier = Modifier.padding(top = Spacing.sm)) {
+            instances.forEachIndexed { index, instance ->
+                InstanceRow(
+                    instance = instance,
+                    session = sessionsByInstanceId[instance.id],
+                    connectionCheck = connectionStatus[instance.id],
+                    onClick = { onOpenInstance(instance) },
+                    onTestConnection = { onTestConnection(instance) },
+                    onDelete = { onDelete(instance) },
+                )
+                if (index != instances.lastIndex) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun InstanceRow(
     instance: Instance,
     session: Session?,
@@ -486,46 +515,69 @@ private fun InstanceRow(
     onTestConnection: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Column(
+    val rowShape = MaterialTheme.shapes.large
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+            .then(
+                if (instance.isCurrent) {
+                    Modifier
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f), rowShape)
+                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.16f), rowShape)
+                } else {
+                    Modifier
+                },
+            )
+            .padding(horizontal = Spacing.sm, vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .background(
+                    if (instance.isCurrent) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                    else MaterialTheme.colorScheme.surfaceVariant,
+                    MaterialTheme.shapes.large,
+                ),
+            contentAlignment = Alignment.Center,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                ) {
-                    Text(
-                        text = instance.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (instance.isCurrent) {
-                        StatusBadge(text = "当前", tone = StatusTone.PRIMARY)
-                    }
-                }
+            Icon(
+                imageVector = Icons.Outlined.Storage,
+                contentDescription = null,
+                tint = if (instance.isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                 Text(
-                    text = instance.baseUrl,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = instance.name,
+                    style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(
-                    text = "最近访问 ${formatTimestamp(instance.lastUsedAt)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                    LoginStatusLabel(session)
-                    ConnectionStatusLabel(connectionCheck)
+                if (instance.isCurrent) {
+                    StatusBadge(text = "当前", tone = StatusTone.PRIMARY)
                 }
             }
+            Text(
+                text = instance.baseUrl,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = "最近访问 ${formatTimestamp(instance.lastUsedAt)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                LoginStatusLabel(session)
+                ConnectionStatusLabel(connectionCheck)
+            }
+        }
+        Column(horizontalAlignment = Alignment.End) {
             Row {
                 IconButton(onClick = onTestConnection) {
                     Icon(Icons.Outlined.Refresh, contentDescription = "测试连接")
@@ -534,12 +586,6 @@ private fun InstanceRow(
                     Icon(Icons.Outlined.DeleteOutline, contentDescription = "删除实例")
                 }
             }
-        }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = Spacing.xxs),
-        ) {
             TextButton(onClick = onClick) { Text("进入") }
         }
     }
