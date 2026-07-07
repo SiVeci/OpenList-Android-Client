@@ -5,14 +5,18 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import androidx.compose.foundation.clickable
 import androidx.core.content.ContextCompat
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -23,15 +27,16 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FileCopy
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Task
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -57,8 +62,6 @@ import io.openlist.client.core.designsystem.components.DirectoryPickerSheet
 import io.openlist.client.core.designsystem.components.EmptyState
 import io.openlist.client.core.designsystem.components.ErrorBar
 import io.openlist.client.core.designsystem.components.OfflineDownloadSheet
-import io.openlist.client.core.designsystem.components.TaskCard
-import io.openlist.client.core.designsystem.components.TaskCardStatus
 import io.openlist.client.core.designsystem.components.TaskTabRow
 import io.openlist.client.core.model.TaskType
 import io.openlist.client.core.model.UnifiedTask
@@ -313,7 +316,6 @@ private fun TaskRow(
     onRetry: () -> Unit,
     onOpenTarget: () -> Unit,
 ) {
-    val cardStatus = task.status.toCardStatus()
     // v1.0: local downloads can now be cancelled too (v1.0_PRD §4.2.C.2) —
     // the LOCAL_DOWNLOAD exclusion that existed before TransferRepository had
     // a cancelDownload method is gone.
@@ -328,42 +330,143 @@ private fun TaskRow(
     // deciding which of the two happens is now [TaskCenterViewModel.openTaskTarget]'s
     // job, resolved only once tapped (not known upfront without a network call).
     val canOpenFolder = task.status == UnifiedTaskStatus.SUCCESS && task.path != null
+    val progress = task.progress
 
-    TaskCard(
-        icon = task.type.toIcon(),
-        title = task.title,
-        status = cardStatus,
-        subtitle = task.path,
-        progress = task.progress?.let { it / 100f },
-        errorMessage = task.errorMessage,
-        onClick = if (canOpenFolder) onOpenTarget else null,
-        actions = {
-            if (canOpenFolder) {
-                IconButton(onClick = onOpenTarget) {
-                    Icon(Icons.Filled.FolderOpen, contentDescription = "跳转目录")
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = canOpenFolder, onClick = onOpenTarget)
+                .padding(vertical = Spacing.sm),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TaskIconTile(task = task)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
+            ) {
+                Text(
+                    text = task.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                task.path?.let { path ->
+                    Text(
+                        text = path,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                task.errorMessage?.takeIf { task.status == UnifiedTaskStatus.FAILED }?.let { message ->
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                if (task.status == UnifiedTaskStatus.RUNNING && progress != null) {
+                    LinearProgressIndicator(
+                        progress = { progress / 100f },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(Spacing.xxs),
+                    )
                 }
             }
-            if (canRetry) {
-                IconButton(onClick = onRetry) {
-                    Icon(Icons.Filled.Refresh, contentDescription = "重试")
-                }
-            }
-            if (canCancel) {
-                IconButton(onClick = onCancel) {
-                    Icon(Icons.Filled.Close, contentDescription = "取消")
-                }
-            }
-        },
-    )
+            TaskStatusAndActions(
+                task = task,
+                canOpenFolder = canOpenFolder,
+                canRetry = canRetry,
+                canCancel = canCancel,
+                onOpenTarget = onOpenTarget,
+                onRetry = onRetry,
+                onCancel = onCancel,
+            )
+        }
+    }
 }
 
-private fun UnifiedTaskStatus.toCardStatus(): TaskCardStatus = when (this) {
-    UnifiedTaskStatus.PENDING -> TaskCardStatus.PENDING
-    UnifiedTaskStatus.RUNNING -> TaskCardStatus.RUNNING
-    UnifiedTaskStatus.SUCCESS -> TaskCardStatus.SUCCESS
-    UnifiedTaskStatus.FAILED -> TaskCardStatus.FAILED
-    UnifiedTaskStatus.CANCELLED -> TaskCardStatus.CANCELLED
-    UnifiedTaskStatus.UNKNOWN -> TaskCardStatus.UNKNOWN
+@Composable
+private fun TaskIconTile(task: UnifiedTask) {
+    val tone = when (task.status) {
+        UnifiedTaskStatus.FAILED -> MaterialTheme.colorScheme.error
+        UnifiedTaskStatus.SUCCESS -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.tertiary
+    }
+    Surface(
+        modifier = Modifier.size(Spacing.sectionSm),
+        shape = MaterialTheme.shapes.medium,
+        color = tone.copy(alpha = 0.12f),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = task.type.toIcon(),
+                contentDescription = null,
+                tint = tone,
+                modifier = Modifier.size(Spacing.xl),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TaskStatusAndActions(
+    task: UnifiedTask,
+    canOpenFolder: Boolean,
+    canRetry: Boolean,
+    canCancel: Boolean,
+    onOpenTarget: () -> Unit,
+    onRetry: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = task.statusLabel(),
+            style = MaterialTheme.typography.labelLarge,
+            color = task.statusColor(),
+        )
+        if (canOpenFolder) {
+            OutlinedButton(onClick = onOpenTarget) {
+                Text("打开")
+            }
+        }
+        if (canRetry) {
+            OutlinedButton(onClick = onRetry) {
+                Text("重试")
+            }
+        }
+        if (canCancel) {
+            IconButton(onClick = onCancel) {
+                Icon(Icons.Filled.Close, contentDescription = "取消")
+            }
+        } else if (task.status == UnifiedTaskStatus.SUCCESS || task.status == UnifiedTaskStatus.FAILED) {
+            Icon(Icons.Filled.MoreVert, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun UnifiedTask.statusColor() = when (status) {
+    UnifiedTaskStatus.FAILED -> MaterialTheme.colorScheme.error
+    UnifiedTaskStatus.SUCCESS -> MaterialTheme.colorScheme.primary
+    UnifiedTaskStatus.RUNNING, UnifiedTaskStatus.PENDING -> MaterialTheme.colorScheme.tertiary
+    UnifiedTaskStatus.CANCELLED, UnifiedTaskStatus.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
+}
+
+private fun UnifiedTask.statusLabel(): String = when (status) {
+    UnifiedTaskStatus.PENDING -> "等待中"
+    UnifiedTaskStatus.RUNNING -> progress?.let { "$it%" } ?: "运行中"
+    UnifiedTaskStatus.SUCCESS -> "已完成"
+    UnifiedTaskStatus.FAILED -> "失败"
+    UnifiedTaskStatus.CANCELLED -> "已取消"
+    UnifiedTaskStatus.UNKNOWN -> "未知"
 }
 
 private fun TaskType.toIcon(): ImageVector = when (this) {
