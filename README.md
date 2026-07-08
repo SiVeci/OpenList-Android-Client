@@ -2,7 +2,7 @@
 
 原生 Android 客户端，用于连接自建的 [OpenList](https://github.com/OpenListTeam/OpenList) 实例：多实例管理、首页工作台、底部导航、最近访问、账号密码/LDAP/2FA-OTP/游客/管理员 Token 多种鉴权方式、目录浏览与目录级权限门控、文件详情、下载（含状态刷新/取消）、文件写操作（新建/重命名/删除/移动/复制）、批量选择、上传（含失败重试）、分享（含入站链接解析）、搜索、统一任务中心、基础离线下载、统一文件预览分发（图片/文本/Markdown[含内嵌图片]/视频/音频 App 内预览，PDF/Office/未知格式外部打开兜底）、基础字幕支持、轻量管理台（管理员门控、用户/存储查看、存储启停、7 类任务管理+批量轻操作、索引管理[含路径选择器]、设置查看、Web 管理台兜底）。
 
-当前版本：**v1.1（首页工作台化 + 全 App UI 重构）**。范围与后续规划见 [v1.1_PRD.md](v1.1_PRD.md)、[v1.1_EXECUTION_PLAN.md](v1.1_EXECUTION_PLAN.md)、[Full_PRD.md](Full_PRD.md)。与 Web 端逐项对照见 [Parity_Matrix.md](Parity_Matrix.md)。历史范围见 [v1.0_PRD.md](v1.0_PRD.md)、[v0.5_PRD.md](v0.5_PRD.md)、[v0.4_PRD.md](v0.4_PRD.md)、[v0.3_PRD.md](v0.3_PRD.md)、[v0.2_PRD.md](v0.2_PRD.md)、[v0.1_PRD.md](v0.1_PRD.md)。
+当前版本：**v1.1.1（v1.1 视觉资源与构建补丁）**。范围与后续规划见 [v1.1_PRD.md](v1.1_PRD.md)、[v1.1_EXECUTION_PLAN.md](v1.1_EXECUTION_PLAN.md)、[Full_PRD.md](Full_PRD.md)。与 Web 端逐项对照见 [Parity_Matrix.md](Parity_Matrix.md)。历史范围见 [v1.0_PRD.md](v1.0_PRD.md)、[v0.5_PRD.md](v0.5_PRD.md)、[v0.4_PRD.md](v0.4_PRD.md)、[v0.3_PRD.md](v0.3_PRD.md)、[v0.2_PRD.md](v0.2_PRD.md)、[v0.1_PRD.md](v0.1_PRD.md)。
 
 ## 技术栈
 
@@ -87,31 +87,41 @@ RELEASE_KEY_PASSWORD
 2. 选择 `Android Manual APK`。
 3. 点击 `Run workflow`。
 4. 保持 `run_tests=true` 可在构建前运行 `testDebugUnitTest`；临时跳过测试时可改为 `false`。
-5. 构建完成后，在 workflow run 的 `Artifacts` 下载签名 APK。
+5. 勾选要构建的 APK 类型。默认只构建 `arm64-v8a`，适合绝大多数现代 Android 手机。
+6. 构建完成后，在 workflow run 的 `Artifacts` 下载签名 APK。
 
 云端构建会执行：
 
 ```bash
-./gradlew assembleRelease -Popenlist.enableAbiSplits=true --stacktrace
+./gradlew assembleRelease \
+  -Popenlist.enableAbiSplits=true \
+  -Popenlist.abiIncludes=arm64-v8a \
+  -Popenlist.universalApk=false \
+  --stacktrace
 ```
 
 Windows PowerShell 本地手动验证时需要给 `-P` 参数加引号：
 
 ```powershell
-.\gradlew.bat assembleRelease "-Popenlist.enableAbiSplits=true" --stacktrace
+.\gradlew.bat assembleRelease "-Popenlist.enableAbiSplits=true" "-Popenlist.abiIncludes=arm64-v8a" "-Popenlist.universalApk=false" --stacktrace
 ```
 
-产物会按版本号和适用平台重命名，例如：
+workflow 可选 APK 类型：
 
 ```text
-openlist-android-v1.1.0-arm64-v8a.apk
-openlist-android-v1.1.0-armeabi-v7a.apk
-openlist-android-v1.1.0-x86.apk
-openlist-android-v1.1.0-x86_64.apk
-openlist-android-v1.1.0-universal.apk
+arm64-v8a       现代 Android 手机，默认推荐
+universal       不确定设备架构时使用，体积更大
+armeabi-v7a     老旧 32 位 ARM 设备
+x86             32 位模拟器/设备
+x86_64          64 位模拟器/设备
 ```
 
-其中 `arm64-v8a` 适合绝大多数现代 Android 手机；不确定设备架构时使用 `universal`。
+产物只会包含你勾选的类型，并按版本号和适用平台重命名，例如：
+
+```text
+openlist-android-v1.1.1-arm64-v8a.apk
+openlist-android-v1.1.1-universal.apk
+```
 
 ## 快速上手（v1.1 功能范围）
 

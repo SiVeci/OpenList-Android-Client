@@ -1,5 +1,22 @@
 # Release Notes
 
+## v1.1.1 — 视觉资源与构建补丁
+
+本补丁延续 v1.1 功能范围，不新增业务功能、权限、路由、API、DTO、Repository 或 Room 结构。
+
+### 新增与调整
+
+- **品牌资源替换**：Android launcher 图标替换为处理后的 OpenList 图形元素；首页、登录页、添加实例页、我的页接入统一品牌 logo 组件。
+- **云端构建选项**：手动 GitHub Actions 构建支持选择 `arm64-v8a`、`armeabi-v7a`、`x86`、`x86_64` 和 universal APK；默认推荐只构建 `arm64-v8a`。
+- **ABI 拆分参数化**：Gradle release 构建支持 `openlist.abiIncludes` 与 `openlist.universalApk` 参数。
+- **versionCode = 8，versionName = "1.1.1"**。
+
+### 验收
+
+`compileDebugKotlin testDebugUnitTest` 与 `assembleDebug` 已通过。图标裁切、圆形图标和小屏品牌露出仍需真机或模拟器人工观感确认，详见 [docs/plans/2026-07-09-logo-replacement-acceptance.md](docs/plans/2026-07-09-logo-replacement-acceptance.md)。
+
+---
+
 ## v1.1.0 — 首页工作台化 + 全 App UI 重构
 
 范围定义见 [v1.1_PRD.md](v1.1_PRD.md)，执行过程见 [v1.1_EXECUTION_PLAN.md](v1.1_EXECUTION_PLAN.md)，实现记录见 [v1.1_IMPLEMENTATION_LOG.md](v1.1_IMPLEMENTATION_LOG.md)，验收见 [v1.1_ACCEPTANCE_REPORT.md](v1.1_ACCEPTANCE_REPORT.md)。

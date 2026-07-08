@@ -51,6 +51,8 @@ import io.openlist.client.core.designsystem.Spacing
 import io.openlist.client.core.designsystem.components.EntryRow
 import io.openlist.client.core.designsystem.components.GroupCard
 import io.openlist.client.core.designsystem.components.HeroHeader
+import io.openlist.client.core.designsystem.components.OpenListBrandLockup
+import io.openlist.client.core.designsystem.components.OpenListLogoSurface
 import io.openlist.client.core.designsystem.components.PlateTone
 import io.openlist.client.core.designsystem.components.StatusBadge
 import io.openlist.client.core.designsystem.components.StatusTone
@@ -110,7 +112,15 @@ fun SettingsScreen(
                 title = "我的",
                 subtitle = currentInstanceName ?: "管理实例、会话与本地设置",
                 onBack = onBack,
-            )
+            ) {
+                OpenListBrandLockup(
+                    surface = OpenListLogoSurface.Dark,
+                    title = "我的",
+                    subtitle = currentInstanceName ?: "管理实例、会话与本地设置",
+                    markSize = 56.dp,
+                    titleStyle = MaterialTheme.typography.headlineMedium,
+                )
+            }
         },
     ) { padding ->
         Column(

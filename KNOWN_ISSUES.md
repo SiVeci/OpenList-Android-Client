@@ -1,6 +1,11 @@
-# Known Issues (v1.1.0)
+# Known Issues (v1.1.1)
 
 v0.1~v1.0 的已知限制见文末历史章节。以下是 v1.1 范围内已知的限制。**与 Web 端的完整逐项对照（12 域、Done/Partial/Web Fallback/Deferred/Not Applicable 分级）见 [Parity_Matrix.md](Parity_Matrix.md)**，本节只收录 Parity Matrix 之外需要单独说明的验证 caveat、裁剪说明与遗留缺口。
+
+## v1.1.1 本轮 caveat
+
+- **品牌图标人工观感确认**：v1.1.1 已替换 launcher 与应用内品牌 logo，并通过编译、单测和 debug 打包；Android 桌面普通图标、圆形图标主体裁切，以及首页/登录页/添加实例页/我的页在 360dp 小屏下的品牌露出仍需真机或模拟器人工确认。
+- **功能范围不变**：v1.1.1 是 v1.1 后视觉资源与构建补丁，不新增业务能力；v1.1.0 的真实管理员会话、真实分享数据、真实预览内容等 caveat 仍沿用。
 
 ## v1.1.0 本轮 caveat 与裁剪说明
 

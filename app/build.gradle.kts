@@ -27,6 +27,18 @@ val enableAbiSplits: Boolean = providers.gradleProperty("openlist.enableAbiSplit
     .map(String::toBoolean)
     .orElse(false)
     .get()
+val abiIncludes: List<String> = providers.gradleProperty("openlist.abiIncludes")
+    .map { value ->
+        value.split(",")
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+    }
+    .orElse(listOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64"))
+    .get()
+val includeUniversalApk: Boolean = providers.gradleProperty("openlist.universalApk")
+    .map(String::toBoolean)
+    .orElse(true)
+    .get()
 
 android {
     namespace = "io.openlist.client"
@@ -36,7 +48,7 @@ android {
         applicationId = "io.openlist.client"
         minSdk = 29
         targetSdk = 35
-        versionCode = 7
+        versionCode = 8
         versionName = libs.versions.appVersionName.get()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -73,8 +85,8 @@ android {
         abi {
             isEnable = enableAbiSplits
             reset()
-            include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
-            isUniversalApk = true
+            include(*abiIncludes.toTypedArray())
+            isUniversalApk = includeUniversalApk
         }
     }
 

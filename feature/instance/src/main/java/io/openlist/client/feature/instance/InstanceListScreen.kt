@@ -56,6 +56,8 @@ import io.openlist.client.core.designsystem.Spacing
 import io.openlist.client.core.designsystem.components.EmptyState
 import io.openlist.client.core.designsystem.components.GroupCard
 import io.openlist.client.core.designsystem.components.InstanceSwitcherChip
+import io.openlist.client.core.designsystem.components.OpenListBrandLockup
+import io.openlist.client.core.designsystem.components.OpenListLogoSurface
 import io.openlist.client.core.designsystem.components.PlateTone
 import io.openlist.client.core.designsystem.components.PrimaryButton
 import io.openlist.client.core.designsystem.components.QuickActionTile
@@ -240,12 +242,10 @@ private fun HomeHeaderSection(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Text(
-            text = "OpenList",
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        OpenListBrandLockup(
+            surface = OpenListLogoSurface.Light,
+            markSize = 36.dp,
+            titleStyle = MaterialTheme.typography.headlineSmall,
         )
         InstanceSwitcherChip(
             label = currentInstance?.name ?: "选择实例",

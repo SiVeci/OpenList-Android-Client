@@ -8,6 +8,31 @@ on:
         required: true
         type: boolean
         default: true
+      build_arm64_v8a:
+        description: "Build arm64-v8a APK, recommended for most modern Android phones"
+        required: true
+        type: boolean
+        default: true
+      build_universal:
+        description: "Build universal APK for unknown or mixed device architectures"
+        required: true
+        type: boolean
+        default: false
+      build_armeabi_v7a:
+        description: "Build armeabi-v7a APK for older 32-bit ARM devices"
+        required: true
+        type: boolean
+        default: false
+      build_x86:
+        description: "Build x86 APK for 32-bit emulators/devices"
+        required: true
+        type: boolean
+        default: false
+      build_x86_64:
+        description: "Build x86_64 APK for 64-bit emulators/devices"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -64,12 +89,55 @@ jobs:
           echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
           echo "ARTIFACT_NAME=openlist-android-v${VERSION_NAME}-${VERSION_CODE}-signed-apks" >> "$GITHUB_ENV"
 
+      - name: Resolve selected APK types
+        run: |
+          abi_includes=()
+          selected_labels=()
+          if [ "${{ inputs.build_arm64_v8a }}" = "true" ]; then
+            abi_includes+=("arm64-v8a")
+            selected_labels+=("arm64-v8a")
+          fi
+          if [ "${{ inputs.build_armeabi_v7a }}" = "true" ]; then
+            abi_includes+=("armeabi-v7a")
+            selected_labels+=("armeabi-v7a")
+          fi
+          if [ "${{ inputs.build_x86 }}" = "true" ]; then
+            abi_includes+=("x86")
+            selected_labels+=("x86")
+          fi
+          if [ "${{ inputs.build_x86_64 }}" = "true" ]; then
+            abi_includes+=("x86_64")
+            selected_labels+=("x86_64")
+          fi
+          universal="${{ inputs.build_universal }}"
+          if [ "$universal" = "true" ]; then
+            selected_labels+=("universal")
+          fi
+          test "${#selected_labels[@]}" -gt 0
+
+          abi_csv="$(IFS=,; echo "${abi_includes[*]}")"
+          labels_csv="$(IFS=,; echo "${selected_labels[*]}")"
+          if [ "${#abi_includes[@]}" -gt 0 ]; then
+            echo "ENABLE_ABI_SPLITS=true" >> "$GITHUB_ENV"
+          else
+            echo "ENABLE_ABI_SPLITS=false" >> "$GITHUB_ENV"
+          fi
+          echo "ABI_INCLUDES=$abi_csv" >> "$GITHUB_ENV"
+          echo "UNIVERSAL_APK=$universal" >> "$GITHUB_ENV"
+          echo "SELECTED_APK_TYPES=$labels_csv" >> "$GITHUB_ENV"
+          echo "Selected APK types: $labels_csv"
+
       - name: Run unit tests
         if: ${{ inputs.run_tests }}
         run: ./gradlew testDebugUnitTest --stacktrace
 
       - name: Build signed release APKs
-        run: ./gradlew assembleRelease -Popenlist.enableAbiSplits=true --stacktrace
+        run: |
+          ./gradlew assembleRelease \
+            -Popenlist.enableAbiSplits="${ENABLE_ABI_SPLITS}" \
+            -Popenlist.abiIncludes="${ABI_INCLUDES}" \
+            -Popenlist.universalApk="${UNIVERSAL_APK}" \
+            --stacktrace
 
       - name: Rename APK outputs
         run: |
@@ -87,8 +155,12 @@ jobs:
               *x86*) abi="x86" ;;
               *universal*) abi="universal" ;;
             esac
+            if [[ ",${SELECTED_APK_TYPES}," != *",${abi},"* ]]; then
+              continue
+            fi
             cp "$apk" "dist/apk/openlist-android-v${VERSION_NAME}-${abi}.apk"
           done
+          test "$(find dist/apk -name '*.apk' | wc -l)" -gt 0
           ls -lh dist/apk
 
       - name: Verify APK signatures

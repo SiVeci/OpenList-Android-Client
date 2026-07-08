@@ -44,6 +44,8 @@ import io.openlist.client.core.designsystem.components.AppTextField
 import io.openlist.client.core.designsystem.components.ErrorBar
 import io.openlist.client.core.designsystem.components.GroupCard
 import io.openlist.client.core.designsystem.components.HeroHeader
+import io.openlist.client.core.designsystem.components.OpenListBrandLockup
+import io.openlist.client.core.designsystem.components.OpenListLogoSurface
 import io.openlist.client.core.designsystem.components.PrimaryButton
 import io.openlist.client.core.designsystem.components.SecondaryButton
 import io.openlist.client.core.designsystem.components.StatusBadge
@@ -68,7 +70,15 @@ fun AddInstanceScreen(
                 title = "连接实例",
                 subtitle = "添加你的 OpenList 服务地址",
                 onBack = onBack,
-            )
+            ) {
+                OpenListBrandLockup(
+                    surface = OpenListLogoSurface.Dark,
+                    title = "连接实例",
+                    subtitle = "添加你的 OpenList 服务地址",
+                    markSize = 56.dp,
+                    titleStyle = MaterialTheme.typography.headlineMedium,
+                )
+            }
         },
     ) { padding ->
         Column(

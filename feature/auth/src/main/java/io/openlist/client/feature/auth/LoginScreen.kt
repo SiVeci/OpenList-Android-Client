@@ -43,6 +43,8 @@ import io.openlist.client.core.designsystem.components.ErrorBar
 import io.openlist.client.core.designsystem.components.GroupCard
 import io.openlist.client.core.designsystem.components.HeroHeader
 import io.openlist.client.core.designsystem.components.LoadingState
+import io.openlist.client.core.designsystem.components.OpenListBrandLockup
+import io.openlist.client.core.designsystem.components.OpenListLogoSurface
 import io.openlist.client.core.designsystem.components.OtpCodeInput
 import io.openlist.client.core.designsystem.components.PrimaryButton
 import io.openlist.client.core.designsystem.components.SecondaryButton
@@ -76,7 +78,15 @@ fun LoginScreen(
                 title = "登录实例",
                 subtitle = uiState.instanceName.ifBlank { uiState.instanceBaseUrl },
                 onBack = onSwitchInstance,
-            )
+            ) {
+                OpenListBrandLockup(
+                    surface = OpenListLogoSurface.Dark,
+                    title = "登录实例",
+                    subtitle = uiState.instanceName.ifBlank { uiState.instanceBaseUrl },
+                    markSize = 56.dp,
+                    titleStyle = MaterialTheme.typography.headlineMedium,
+                )
+            }
         },
     ) { padding ->
         Column(
