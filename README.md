@@ -66,6 +66,53 @@ RELEASE_KEY_ALIAS=openlist
 RELEASE_KEY_PASSWORD=你的key密码
 ```
 
+### GitHub Actions 手动云端签名构建
+
+仓库提供手动触发的 GitHub Actions 工作流：`Android Manual APK`。它不会在 push、PR 或 tag 时自动运行，也不会自动创建 GitHub Release。
+
+在 GitHub 仓库 `Settings -> Secrets and variables -> Actions` 配置：
+
+```text
+RELEASE_KEYSTORE_BASE64
+RELEASE_STORE_PASSWORD
+RELEASE_KEY_ALIAS
+RELEASE_KEY_PASSWORD
+```
+
+`RELEASE_KEYSTORE_BASE64` 是本地 `release.keystore` 的 Base64 单行内容。不要提交 keystore、Base64 文本或 `local.properties`。
+
+手动构建路径：
+
+1. 打开 GitHub 仓库的 `Actions`。
+2. 选择 `Android Manual APK`。
+3. 点击 `Run workflow`。
+4. 保持 `run_tests=true` 可在构建前运行 `testDebugUnitTest`；临时跳过测试时可改为 `false`。
+5. 构建完成后，在 workflow run 的 `Artifacts` 下载签名 APK。
+
+云端构建会执行：
+
+```bash
+./gradlew assembleRelease -Popenlist.enableAbiSplits=true --stacktrace
+```
+
+Windows PowerShell 本地手动验证时需要给 `-P` 参数加引号：
+
+```powershell
+.\gradlew.bat assembleRelease "-Popenlist.enableAbiSplits=true" --stacktrace
+```
+
+产物会按版本号和适用平台重命名，例如：
+
+```text
+openlist-android-v1.1.0-arm64-v8a.apk
+openlist-android-v1.1.0-armeabi-v7a.apk
+openlist-android-v1.1.0-x86.apk
+openlist-android-v1.1.0-x86_64.apk
+openlist-android-v1.1.0-universal.apk
+```
+
+其中 `arm64-v8a` 适合绝大多数现代 Android 手机；不确定设备架构时使用 `universal`。
+
 ## 快速上手（v1.1 功能范围）
 
 1. 打开 App，点击「添加实例」，输入 OpenList 实例地址（`http(s)://` 开头，支持部署在子路径；`http://` 会显示明文传输风险提示）。

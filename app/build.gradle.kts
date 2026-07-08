@@ -23,6 +23,10 @@ val releaseStorePassword: String? = keystoreProperties.getProperty("RELEASE_STOR
 val releaseKeyAlias: String? = keystoreProperties.getProperty("RELEASE_KEY_ALIAS")
 val releaseKeyPassword: String? = keystoreProperties.getProperty("RELEASE_KEY_PASSWORD")
 val hasReleaseSigning = releaseStoreFile != null
+val enableAbiSplits: Boolean = providers.gradleProperty("openlist.enableAbiSplits")
+    .map(String::toBoolean)
+    .orElse(false)
+    .get()
 
 android {
     namespace = "io.openlist.client"
@@ -62,6 +66,15 @@ android {
         }
         debug {
             isDebuggable = true
+        }
+    }
+
+    splits {
+        abi {
+            isEnable = enableAbiSplits
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+            isUniversalApk = true
         }
     }
 
