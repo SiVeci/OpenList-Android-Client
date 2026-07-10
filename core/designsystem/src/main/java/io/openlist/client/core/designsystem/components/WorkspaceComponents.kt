@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.openlist.client.core.designsystem.OpenListPalette
 import io.openlist.client.core.designsystem.OpenListTheme
 import io.openlist.client.core.designsystem.PillShape
 import io.openlist.client.core.designsystem.Spacing
@@ -322,7 +323,8 @@ private fun summaryColors(tone: StatusTone): PlateColors {
         StatusTone.SUCCESS -> PlateColors(extended.success.copy(alpha = 0.12f), extended.success)
         StatusTone.WARNING, StatusTone.PENDING -> PlateColors(extended.warning.copy(alpha = 0.12f), extended.warning)
         StatusTone.ERROR -> PlateColors(scheme.error.copy(alpha = 0.12f), scheme.error)
-        StatusTone.PRIMARY, StatusTone.RUNNING -> PlateColors(scheme.primary.copy(alpha = 0.12f), scheme.primary)
+        // Activity metrics read as strong ink, not purple (产品级中性化, 2026-07-11).
+        StatusTone.PRIMARY, StatusTone.RUNNING -> PlateColors(scheme.surfaceVariant, scheme.onSurface)
         StatusTone.NEUTRAL -> PlateColors(scheme.surfaceVariant, scheme.onSurfaceVariant)
     }
 }
@@ -336,11 +338,14 @@ private fun plateColors(tone: PlateTone): PlateColors {
     val extended = OpenListTheme.extendedColors
     val scheme = MaterialTheme.colorScheme
     return when (tone) {
-        PlateTone.PRIMARY -> PlateColors(scheme.primary.copy(alpha = 0.12f), scheme.primary)
+        // Neutral by default (产品级中性化, 2026-07-11): purple is reserved for
+        // the dominant CTA, so the workhorse plate is warm gray + ink.
+        PlateTone.PRIMARY -> PlateColors(scheme.surfaceVariant, scheme.onSurface)
         PlateTone.SUCCESS -> PlateColors(extended.success.copy(alpha = 0.12f), extended.success)
         PlateTone.WARNING -> PlateColors(extended.warning.copy(alpha = 0.12f), extended.warning)
         PlateTone.ERROR -> PlateColors(scheme.error.copy(alpha = 0.12f), scheme.error)
-        PlateTone.INFO -> PlateColors(scheme.tertiary.copy(alpha = 0.12f), scheme.tertiary)
+        PlateTone.INFO -> pastelStyle(OpenListPalette.TintCream, OpenListPalette.BrandBrown)
+            .let { PlateColors(it.container, it.content) }
         PlateTone.NEUTRAL -> PlateColors(scheme.surfaceVariant, scheme.onSurfaceVariant)
     }
 }

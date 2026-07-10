@@ -129,7 +129,7 @@ private fun ShareOpenHeader() {
             Icon(
                 Icons.Outlined.Share,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(34.dp),
             )
             Column(modifier = Modifier.weight(1f)) {
@@ -163,7 +163,7 @@ private fun ClipboardSuggestionCard(
     ) {
         Column(modifier = Modifier.padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.Link, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                Icon(Icons.Outlined.Link, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                 Text("检测到剪贴板中的分享链接", style = MaterialTheme.typography.titleSmall)
             }
             Text(
@@ -223,7 +223,7 @@ private fun PasswordPanel(
 ) {
     GroupCard {
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.Password, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Icon(Icons.Outlined.Password, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("该分享需要密码", style = MaterialTheme.typography.titleMedium)
         }
         Spacer(modifier = Modifier.height(Spacing.sm))
@@ -268,7 +268,7 @@ private fun ResolvedPanel(
             Icon(
                 imageVector = if (info.isDir) Icons.Outlined.Folder else Icons.Outlined.InsertDriveFile,
                 contentDescription = null,
-                tint = if (info.isDir) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(38.dp),
             )
             Column(modifier = Modifier.weight(1f)) {
@@ -340,7 +340,7 @@ private fun ActionRow(
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
             Text(

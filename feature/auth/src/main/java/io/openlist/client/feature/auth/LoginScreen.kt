@@ -267,13 +267,13 @@ private fun InstanceSummary(name: String, baseUrl: String) {
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .background(MaterialTheme.colorScheme.primary, CircleShape),
+                    .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = name.ifBlank { baseUrl }.take(1).uppercase(),
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
                     fontWeight = FontWeight.SemiBold,
                 )
             }

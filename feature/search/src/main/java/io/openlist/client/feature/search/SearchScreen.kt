@@ -343,7 +343,7 @@ private fun SearchResultRow(
             Icon(
                 imageVector = if (result.isDir) Icons.Outlined.Folder else Icons.Outlined.InsertDriveFile,
                 contentDescription = null,
-                tint = if (result.isDir) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(36.dp),
             )
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
@@ -405,7 +405,7 @@ private fun IndexHintCard(
             Icon(
                 Icons.Outlined.Info,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(28.dp),
             )
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {

@@ -51,7 +51,7 @@ fun ListRowItem(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surface)
+            .background(if (selected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surface)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = Spacing.md, vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
@@ -111,7 +111,7 @@ fun Breadcrumb(
                 color = if (index == segments.lastIndex) {
                     MaterialTheme.colorScheme.onSurface
                 } else {
-                    MaterialTheme.colorScheme.primary
+                    MaterialTheme.colorScheme.onSurfaceVariant
                 },
                 modifier = Modifier.clickable { onSegmentClick(index) },
             )

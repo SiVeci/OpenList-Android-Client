@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import io.openlist.client.core.designsystem.OpenListPalette
 import io.openlist.client.core.designsystem.Spacing
 import io.openlist.client.core.designsystem.components.EmptyState
 import io.openlist.client.core.designsystem.components.ErrorBar
@@ -126,7 +127,7 @@ fun AdminSettingsTab(
                                 Text(
                                     text = groupLabel(group),
                                     style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.primary,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.xs),
                                 )
                             }
@@ -192,7 +193,7 @@ private fun AdminWebFallbackRow(webFallback: AdminCardState<WebFallbackTarget>) 
                         launchError = openInExternalBrowser(context, target.url)
                     },
                 ) {
-                    Text("在 Web 端编辑", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
+                    Text("在 Web 端编辑", style = MaterialTheme.typography.bodyLarge, color = OpenListPalette.LinkBlue)
                     Text(
                         text = "设置的新增/修改/重置 Token 等操作需要在浏览器中的 Web 管理台完成",
                         style = MaterialTheme.typography.bodySmall,
@@ -204,7 +205,7 @@ private fun AdminWebFallbackRow(webFallback: AdminCardState<WebFallbackTarget>) 
                     Text(
                         text = "复制链接",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = OpenListPalette.LinkBlue,
                         modifier = Modifier.clickable { clipboardManager.setText(AnnotatedString(target.url)) },
                     )
                 }

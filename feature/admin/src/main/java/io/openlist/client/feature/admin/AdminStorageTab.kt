@@ -31,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
+import io.openlist.client.core.designsystem.OpenListPalette
 import io.openlist.client.core.designsystem.Spacing
 import io.openlist.client.core.designsystem.components.ConfirmDialog
 import io.openlist.client.core.designsystem.components.EmptyState
@@ -134,7 +135,7 @@ private fun ReloadAllRow(onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(horizontal = Spacing.md, vertical = Spacing.sm),
     ) {
-        Text("重新加载全部存储", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
+        Text("重新加载全部存储", style = MaterialTheme.typography.bodyLarge, color = OpenListPalette.LinkBlue)
     }
 }
 

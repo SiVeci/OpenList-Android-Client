@@ -637,7 +637,7 @@ private fun UploadProgressBanner(
             Icon(
                 imageVector = Icons.Filled.CloudSync,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(28.dp),
             )
             Column(

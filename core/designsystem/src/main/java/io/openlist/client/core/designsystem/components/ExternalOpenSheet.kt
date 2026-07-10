@@ -119,7 +119,7 @@ private fun ExternalOpenActionTile(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(28.dp),
             )
             Column(modifier = Modifier.weight(1f)) {

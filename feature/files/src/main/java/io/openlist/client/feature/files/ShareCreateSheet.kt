@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import io.openlist.client.core.designsystem.OpenListPalette
 import io.openlist.client.core.designsystem.Spacing
 import io.openlist.client.core.designsystem.components.ExpiryOption
 import io.openlist.client.core.designsystem.components.ShareFormSheet
@@ -44,7 +45,7 @@ fun ShareCreateSheet(
             ) {
                 Text("分享创建成功", style = MaterialTheme.typography.titleMedium)
                 androidx.compose.foundation.layout.Spacer(Modifier.padding(top = Spacing.xs))
-                Text(state.shareUrl, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                Text(state.shareUrl, style = MaterialTheme.typography.bodyMedium, color = OpenListPalette.LinkBlue)
                 androidx.compose.foundation.layout.Spacer(Modifier.padding(top = Spacing.md))
                 ShareLinkActions(
                     onCopyLink = { clipboardManager.setText(AnnotatedString(state.shareUrl)) },

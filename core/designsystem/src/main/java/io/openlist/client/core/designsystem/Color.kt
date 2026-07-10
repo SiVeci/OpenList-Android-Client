@@ -49,6 +49,7 @@ object OpenListPalette {
     val BrandPurple800 = Color(0xFF391C57)
     val BrandGreen = Color(0xFF1AAE39)
     val BrandBrown = Color(0xFF523410)
+    val LinkBlue = Color(0xFF0075DE)
     val LinkBlueDeep = Color(0xFF005BAB)
 
     // colors.brand-navy / on-dark* — hero band family.
@@ -65,50 +66,112 @@ object OpenListPalette {
     val BrandTeal = Color(0xFF2A9D99)
     val BrandYellow = Color(0xFFF5D75E)
 
-    // Dark-theme surface ramp: DESIGN.md has no dark tokens (documented Known Gap),
-    // derived here from the same navy/charcoal family used for on-dark text.
-    val DarkCanvas = Color(0xFF15161A)
-    val DarkSurface = Color(0xFF1D1F24)
-    val DarkSurfaceSoft = Color(0xFF24262C)
-    val DarkHairline = Color(0xFF34363D)
-    val DarkHairlineStrong = Color(0xFF44474F)
+    // Dark-theme surface ramp: DESIGN.md has no dark tokens (documented Known Gap).
+    // Derived as a WARM charcoal family (matching Notion's product dark mode and
+    // the warm light-theme neutrals above) — deliberately hue-free, no blue cast
+    // (产品级中性化决策, 2026-07-11).
+    val DarkCanvas = Color(0xFF191919)
+    val DarkCanvasDim = Color(0xFF141414)
+    val DarkSurface = Color(0xFF1F1F1F)
+    val DarkSurfaceSoft = Color(0xFF262626)
+    val DarkContainer = Color(0xFF232323)
+    val DarkContainerHigh = Color(0xFF2A2A2A)
+    val DarkContainerHighest = Color(0xFF303030)
+    val DarkBright = Color(0xFF3B3B3B)
+    val DarkHairline = Color(0xFF373737)
+    val DarkHairlineStrong = Color(0xFF4D4D4D)
     val DarkInk = Color(0xFFF3F2F0)
     val DarkSlate = Color(0xFFB9B6AE)
-    val DarkPrimary = Color(0xFF9B8CFF)
+    // Muted lavender rather than the old periwinkle #9B8CFF: keeps the brand
+    // hue readable on dark without tipping the whole theme blue-purple.
+    val DarkPrimary = Color(0xFFB3A6E3)
+    val DarkErrorContainer = Color(0xFF4A2B2B)
+    val DarkOnErrorContainer = Color(0xFFF2C7C4)
 }
 
+// Every slot is mapped explicitly: unset slots fall back to Material3's
+// baseline (Google's violet-cast neutrals + purple secondary/tertiary), which
+// is exactly the "蓝紫" cast this scheme must not have. surfaceTint is
+// transparent so tonal elevation never washes surfaces with primary.
 val LightColorScheme = lightColorScheme(
     primary = OpenListPalette.Primary,
     onPrimary = OpenListPalette.OnPrimary,
-    primaryContainer = OpenListPalette.PrimaryDeep,
-    onPrimaryContainer = OpenListPalette.OnPrimary,
+    // Light container pair per DESIGN.md badge-tag-purple (lavender plate +
+    // deep purple ink) — NOT the old PrimaryDeep block.
+    primaryContainer = OpenListPalette.TintLavender,
+    onPrimaryContainer = OpenListPalette.BrandPurple800,
+    inversePrimary = OpenListPalette.TintLavender,
+    secondary = OpenListPalette.Slate,
+    onSecondary = OpenListPalette.OnPrimary,
+    secondaryContainer = OpenListPalette.HairlineSoft,
+    onSecondaryContainer = OpenListPalette.Charcoal,
+    tertiary = OpenListPalette.Steel,
+    onTertiary = OpenListPalette.OnPrimary,
+    tertiaryContainer = OpenListPalette.TintGray,
+    onTertiaryContainer = OpenListPalette.Charcoal,
     background = OpenListPalette.Canvas,
     onBackground = OpenListPalette.Ink,
     surface = OpenListPalette.Canvas,
     onSurface = OpenListPalette.Ink,
     surfaceVariant = OpenListPalette.Surface,
     onSurfaceVariant = OpenListPalette.Slate,
+    surfaceTint = Color.Transparent,
+    inverseSurface = OpenListPalette.Charcoal,
+    inverseOnSurface = OpenListPalette.SurfaceSoft,
     outline = OpenListPalette.HairlineStrong,
     outlineVariant = OpenListPalette.Hairline,
     error = OpenListPalette.Error,
     onError = OpenListPalette.OnPrimary,
+    errorContainer = OpenListPalette.TintRose,
+    onErrorContainer = OpenListPalette.Error,
+    scrim = OpenListPalette.InkDeep,
+    surfaceBright = OpenListPalette.Canvas,
+    surfaceDim = OpenListPalette.HairlineSoft,
+    // Warm-gray elevation ramp (sheets, dialogs, menus, scrolled top bars).
+    surfaceContainerLowest = OpenListPalette.Canvas,
+    surfaceContainerLow = OpenListPalette.SurfaceSoft,
+    surfaceContainer = OpenListPalette.Surface,
+    surfaceContainerHigh = OpenListPalette.TintGray,
+    surfaceContainerHighest = OpenListPalette.HairlineSoft,
 )
 
 val DarkColorScheme = darkColorScheme(
     primary = OpenListPalette.DarkPrimary,
     onPrimary = OpenListPalette.InkDeep,
-    primaryContainer = OpenListPalette.PrimaryDeep,
-    onPrimaryContainer = OpenListPalette.OnPrimary,
+    primaryContainer = OpenListPalette.BrandPurple800,
+    onPrimaryContainer = OpenListPalette.TintLavender,
+    inversePrimary = OpenListPalette.Primary,
+    secondary = OpenListPalette.DarkSlate,
+    onSecondary = OpenListPalette.InkDeep,
+    secondaryContainer = OpenListPalette.DarkContainerHighest,
+    onSecondaryContainer = OpenListPalette.DarkInk,
+    tertiary = OpenListPalette.DarkSlate,
+    onTertiary = OpenListPalette.InkDeep,
+    tertiaryContainer = OpenListPalette.DarkContainerHigh,
+    onTertiaryContainer = OpenListPalette.DarkInk,
     background = OpenListPalette.DarkCanvas,
     onBackground = OpenListPalette.DarkInk,
     surface = OpenListPalette.DarkSurface,
     onSurface = OpenListPalette.DarkInk,
     surfaceVariant = OpenListPalette.DarkSurfaceSoft,
     onSurfaceVariant = OpenListPalette.DarkSlate,
+    surfaceTint = Color.Transparent,
+    inverseSurface = OpenListPalette.DarkInk,
+    inverseOnSurface = OpenListPalette.Ink,
     outline = OpenListPalette.DarkHairlineStrong,
     outlineVariant = OpenListPalette.DarkHairline,
     error = OpenListPalette.Error,
     onError = OpenListPalette.OnPrimary,
+    errorContainer = OpenListPalette.DarkErrorContainer,
+    onErrorContainer = OpenListPalette.DarkOnErrorContainer,
+    scrim = OpenListPalette.InkDeep,
+    surfaceBright = OpenListPalette.DarkBright,
+    surfaceDim = OpenListPalette.DarkCanvasDim,
+    surfaceContainerLowest = OpenListPalette.DarkCanvasDim,
+    surfaceContainerLow = OpenListPalette.DarkSurface,
+    surfaceContainer = OpenListPalette.DarkContainer,
+    surfaceContainerHigh = OpenListPalette.DarkContainerHigh,
+    surfaceContainerHighest = OpenListPalette.DarkContainerHighest,
 )
 
 /** Semantic colors outside Material3's default ColorScheme slots (success/warning). */

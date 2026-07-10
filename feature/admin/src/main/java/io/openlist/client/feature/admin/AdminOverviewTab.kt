@@ -42,6 +42,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.openlist.client.core.designsystem.OpenListPalette
 import io.openlist.client.core.designsystem.Spacing
 import io.openlist.client.core.designsystem.components.StatusBadge
 import io.openlist.client.core.designsystem.components.StatusTone
@@ -110,7 +111,7 @@ private fun AdminInstanceInfoCard(info: AdminInstanceInfo?) {
             Icon(
                 Icons.Outlined.AdminPanelSettings,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(34.dp),
             )
             Column(modifier = Modifier.weight(1f)) {
@@ -143,7 +144,7 @@ private fun <T> AdminSummaryCard(
 ) {
     OverviewCard(modifier = modifier) {
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
             Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
         }
         Spacer(Modifier.size(Spacing.xs))
@@ -166,7 +167,7 @@ private fun AdminWebFallbackEntryCard(state: AdminCardState<WebFallbackTarget>) 
 
     OverviewCard {
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
+            Icon(Icons.Outlined.Language, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text("Web 管理台", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
                 Text(
@@ -194,11 +195,12 @@ private fun AdminWebFallbackEntryCard(state: AdminCardState<WebFallbackTarget>) 
                     horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Outlined.OpenInBrowser, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    // Links are link-blue per DESIGN.md button-link — never the purple CTA color.
+                    Icon(Icons.Outlined.OpenInBrowser, contentDescription = null, tint = OpenListPalette.LinkBlue)
                     Text(
                         text = "在浏览器中打开",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = OpenListPalette.LinkBlue,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -212,10 +214,10 @@ private fun AdminWebFallbackEntryCard(state: AdminCardState<WebFallbackTarget>) 
                         Icon(
                             Icons.Outlined.ContentCopy,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = OpenListPalette.LinkBlue,
                             modifier = Modifier.size(18.dp),
                         )
-                        Text("复制链接", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                        Text("复制链接", style = MaterialTheme.typography.bodySmall, color = OpenListPalette.LinkBlue)
                     }
                 }
             }

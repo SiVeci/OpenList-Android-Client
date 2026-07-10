@@ -57,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import io.openlist.client.core.designsystem.OpenListTheme
 import io.openlist.client.core.designsystem.Spacing
 import io.openlist.client.core.designsystem.components.AppTopBar
 import io.openlist.client.core.designsystem.components.ConfirmDialog
@@ -122,7 +123,13 @@ fun TaskCenterScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { viewModel.openOfflineDownloadSheet() }) {
+            // The screen's dominant CTA — the one place that carries the
+            // signature purple (M3's default primaryContainer FAB does not).
+            FloatingActionButton(
+                onClick = { viewModel.openOfflineDownloadSheet() },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            ) {
                 Icon(Icons.Filled.Add, contentDescription = "新增离线下载")
             }
         },
@@ -417,8 +424,8 @@ private fun TaskRow(
 private fun TaskIconTile(task: UnifiedTask) {
     val tone = when (task.status) {
         UnifiedTaskStatus.FAILED -> MaterialTheme.colorScheme.error
-        UnifiedTaskStatus.SUCCESS -> MaterialTheme.colorScheme.primary
-        else -> MaterialTheme.colorScheme.tertiary
+        UnifiedTaskStatus.SUCCESS -> OpenListTheme.extendedColors.success
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     Surface(
         modifier = Modifier.size(Spacing.sectionSm),
@@ -478,8 +485,11 @@ private fun TaskStatusAndActions(
 @Composable
 private fun UnifiedTask.statusColor() = when (status) {
     UnifiedTaskStatus.FAILED -> MaterialTheme.colorScheme.error
-    UnifiedTaskStatus.SUCCESS -> MaterialTheme.colorScheme.primary
-    UnifiedTaskStatus.RUNNING, UnifiedTaskStatus.PENDING -> MaterialTheme.colorScheme.tertiary
+    UnifiedTaskStatus.SUCCESS -> OpenListTheme.extendedColors.success
+    // Progress/activity keeps the single small primary accent; waiting is the
+    // semantic warning orange (matches the PENDING badge).
+    UnifiedTaskStatus.RUNNING -> MaterialTheme.colorScheme.primary
+    UnifiedTaskStatus.PENDING -> OpenListTheme.extendedColors.warning
     UnifiedTaskStatus.CANCELLED, UnifiedTaskStatus.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 

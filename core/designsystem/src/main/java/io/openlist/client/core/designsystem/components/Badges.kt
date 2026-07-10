@@ -41,7 +41,9 @@ private fun badgeColors(tone: StatusTone): Pair<Color, Color> {
         StatusTone.SUCCESS -> extended.success.copy(alpha = 0.14f) to extended.success
         StatusTone.WARNING -> extended.warning.copy(alpha = 0.14f) to extended.warning
         StatusTone.ERROR -> scheme.error.copy(alpha = 0.14f) to scheme.error
-        StatusTone.PRIMARY -> scheme.primary to scheme.onPrimary
+        // DESIGN.md pill-tab-active (ink-deep chip, on-dark text) instead of a
+        // solid purple badge — purple stays reserved for the dominant CTA.
+        StatusTone.PRIMARY -> scheme.inverseSurface to scheme.inverseOnSurface
         // badge-tag lavender+purple-800 (v0.3_EXECUTION_PLAN.md §7.1) — running tasks.
         StatusTone.RUNNING -> OpenListPalette.TintLavender to OpenListPalette.BrandPurple800
         // badge-tag peach+orange-deep — pending/waiting tasks.

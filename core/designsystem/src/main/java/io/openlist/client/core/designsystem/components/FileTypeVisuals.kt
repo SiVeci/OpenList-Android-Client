@@ -51,13 +51,16 @@ data class PastelStyle(val container: Color, val content: Color)
 fun pastelStyle(tint: Color, deep: Color): PastelStyle =
     if (OpenListTheme.isDark) PastelStyle(deep.copy(alpha = 0.32f), tint) else PastelStyle(tint, deep)
 
+// FOLDER and DOCUMENT dominate real listings, so they stay warm-neutral;
+// lavender/sky would put purple/blue on half the rows (产品级中性化, 2026-07-11).
+// The rarer media kinds keep their warm pastel echo.
 @Composable
 fun fileKindStyle(kind: FileKind): PastelStyle = when (kind) {
-    FileKind.FOLDER -> pastelStyle(OpenListPalette.TintLavender, OpenListPalette.BrandPurple800)
+    FileKind.FOLDER -> pastelStyle(OpenListPalette.TintGray, OpenListPalette.Charcoal)
     FileKind.IMAGE -> pastelStyle(OpenListPalette.TintMint, OpenListPalette.BrandGreen)
     FileKind.VIDEO -> pastelStyle(OpenListPalette.TintPeach, OpenListPalette.BrandOrangeDeep)
     FileKind.AUDIO -> pastelStyle(OpenListPalette.TintRose, OpenListPalette.BrandPinkDeep)
-    FileKind.DOCUMENT -> pastelStyle(OpenListPalette.TintSky, OpenListPalette.LinkBlueDeep)
+    FileKind.DOCUMENT -> pastelStyle(OpenListPalette.TintCream, OpenListPalette.BrandBrown)
     FileKind.ARCHIVE -> pastelStyle(OpenListPalette.TintYellow, OpenListPalette.BrandBrown)
     FileKind.CODE -> pastelStyle(OpenListPalette.TintGray, OpenListPalette.Charcoal)
     FileKind.OTHER -> pastelStyle(OpenListPalette.TintGray, OpenListPalette.Slate)

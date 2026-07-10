@@ -379,13 +379,13 @@ private fun EntryAvatar(text: String) {
     Box(
         modifier = Modifier
             .size(44.dp)
-            .background(MaterialTheme.colorScheme.primary, CircleShape),
+            .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = Icons.Outlined.Person,
             contentDescription = text,
-            tint = MaterialTheme.colorScheme.onPrimary,
+            tint = MaterialTheme.colorScheme.onSecondaryContainer,
         )
     }
 }

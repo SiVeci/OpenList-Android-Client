@@ -430,13 +430,13 @@ private fun InstanceSwitcherRow(
         Box(
             modifier = Modifier
                 .size(40.dp)
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), MaterialTheme.shapes.large),
+                .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.large),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = Icons.Outlined.Folder,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp),
             )
         }
@@ -529,13 +529,13 @@ private fun RecentPathRow(
         Box(
             modifier = Modifier
                 .size(40.dp)
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), MaterialTheme.shapes.large),
+                .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.large),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = Icons.Outlined.Folder,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp),
             )
         }
@@ -557,7 +557,7 @@ private fun RecentPathRow(
         }
         StatusBadge(
             text = instanceName,
-            tone = StatusTone.PRIMARY,
+            tone = StatusTone.NEUTRAL,
         )
         Icon(
             imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
@@ -626,8 +626,12 @@ private fun InstanceRow(
 ) {
     // Density pass (2026-07): the whole row IS the "进入" affordance (the old
     // trailing TextButton duplicated it); test/delete sit inline at the row
-    // end, and the four stacked meta lines collapsed into name-line badges +
-    // one "url · 最近访问" line, taking the row from ~112dp to ~64dp.
+    // end, and the four stacked meta lines collapsed into a name line +
+    // one "url · 最近访问 + 登录/连接徽章" line, taking the row from ~112dp to
+    // ~64dp. "当前" has no badge here on purpose: the tinted background /
+    // border / icon tint below already mark the current row, and a badge on
+    // the name line collided with the login badge when name and url are long.
+    // Current-row tint is warm gray, not purple (产品级中性化, 2026-07-11).
     val rowShape = MaterialTheme.shapes.large
     Row(
         modifier = Modifier
@@ -635,8 +639,8 @@ private fun InstanceRow(
             .then(
                 if (instance.isCurrent) {
                     Modifier
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f), rowShape)
-                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.16f), rowShape)
+                        .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f), rowShape)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, rowShape)
                 } else {
                     Modifier
                 },
@@ -649,36 +653,26 @@ private fun InstanceRow(
         Box(
             modifier = Modifier
                 .size(40.dp)
-                .background(
-                    if (instance.isCurrent) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                    else MaterialTheme.colorScheme.surfaceVariant,
-                    MaterialTheme.shapes.large,
-                ),
+                .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.large),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = Icons.Outlined.Storage,
                 contentDescription = null,
-                tint = if (instance.isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (instance.isCurrent) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp),
             )
         }
-        Column(modifier = Modifier.weight(1f)) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = instance.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                if (instance.isCurrent) {
-                    StatusBadge(text = "当前", tone = StatusTone.PRIMARY)
-                }
-            }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
+        ) {
+            Text(
+                text = instance.name,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             Row(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
