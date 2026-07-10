@@ -2,7 +2,7 @@
 
 原生 Android 客户端，用于连接自建的 [OpenList](https://github.com/OpenListTeam/OpenList) 实例：多实例管理、首页工作台、底部导航、最近访问、账号密码/LDAP/2FA-OTP/游客/管理员 Token 多种鉴权方式、目录浏览与目录级权限门控、文件详情、下载（含状态刷新/取消）、文件写操作（新建/重命名/删除/移动/复制）、批量选择、上传（含失败重试）、分享（含入站链接解析）、搜索、统一任务中心、基础离线下载、统一文件预览分发（图片/文本/Markdown[含内嵌图片]/视频/音频 App 内预览，PDF/Office/未知格式外部打开兜底）、基础字幕支持、轻量管理台（管理员门控、用户/存储查看、存储启停、7 类任务管理+批量轻操作、索引管理[含路径选择器]、设置查看、Web 管理台兜底）。
 
-当前版本：**v1.2.0（全局 UI 紧凑化与空间化转场）**。本版范围与验收见 [v1.2_PRD.md](v1.2_PRD.md)、[v1.2_EXECUTION_PLAN.md](v1.2_EXECUTION_PLAN.md)、[v1.2_ACCEPTANCE_REPORT.md](v1.2_ACCEPTANCE_REPORT.md)；长期规划见 [Full_PRD.md](Full_PRD.md)。与 Web 端逐项对照见 [Parity_Matrix.md](Parity_Matrix.md)。历史范围见 [v1.1_PRD.md](v1.1_PRD.md)、[v1.0_PRD.md](v1.0_PRD.md)、[v0.5_PRD.md](v0.5_PRD.md)、[v0.4_PRD.md](v0.4_PRD.md)、[v0.3_PRD.md](v0.3_PRD.md)、[v0.2_PRD.md](v0.2_PRD.md)、[v0.1_PRD.md](v0.1_PRD.md)。
+当前版本：**v1.3.0（产品级中性配色与统一中文字体体系）**。本版范围与验收见 [v1.3_PRD.md](v1.3_PRD.md)、[v1.3_EXECUTION_PLAN.md](v1.3_EXECUTION_PLAN.md)、[v1.3_ACCEPTANCE_REPORT.md](v1.3_ACCEPTANCE_REPORT.md)；长期规划见 [Full_PRD.md](Full_PRD.md)。与 Web 端逐项对照见 [Parity_Matrix.md](Parity_Matrix.md)。历史范围见 [v1.2_PRD.md](v1.2_PRD.md)、[v1.1_PRD.md](v1.1_PRD.md)、[v1.0_PRD.md](v1.0_PRD.md)、[v0.5_PRD.md](v0.5_PRD.md)、[v0.4_PRD.md](v0.4_PRD.md)、[v0.3_PRD.md](v0.3_PRD.md)、[v0.2_PRD.md](v0.2_PRD.md)、[v0.1_PRD.md](v0.1_PRD.md)。
 
 ## 技术栈
 
@@ -119,11 +119,11 @@ x86_64          64 位模拟器/设备
 产物只会包含你勾选的类型，并按版本号和适用平台重命名，例如：
 
 ```text
-openlist-android-v1.2.0-arm64-v8a.apk
-openlist-android-v1.2.0-universal.apk
+openlist-android-v1.3.0-arm64-v8a.apk
+openlist-android-v1.3.0-universal.apk
 ```
 
-## 快速上手（v1.2 功能范围）
+## 快速上手（v1.3 功能范围）
 
 1. 打开 App，点击「添加实例」，输入 OpenList 实例地址（`http(s)://` 开头，支持部署在子路径；`http://` 会显示明文传输风险提示）。
 2. 「测试连接」确认可达（依次尝试 `/ping`、`/api/public/settings`）。

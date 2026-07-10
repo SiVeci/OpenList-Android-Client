@@ -1,5 +1,26 @@
 # Release Notes
 
+## v1.3.0 — 产品级中性配色与统一中文字体体系
+
+本版在 v1.2.0 完整业务能力和空间化交互基础上，完成跨页面设计系统与中文排版升级；不新增 API、DTO、Repository、Room 数据结构、权限、路由、运行时依赖或业务功能。
+
+### 新增与调整
+
+- **产品级中性配色**：浅色主题收敛为暖白/暖灰/炭黑，深色主题改为暖炭灰表面层级和柔和薰衣草主色，降低非关键区域的蓝紫色占比。
+- **完整 Material 3 槽位**：浅色和深色 `ColorScheme` 显式配置关键槽位，关闭 `surfaceTint` tonal elevation 染色，避免未赋值槽位回退到默认蓝紫体系。
+- **颜色角色收敛**：紫色仅保留给主 CTA、FAB、焦点、进度和选中态；新增独立 LinkBlue 用于真实链接；文件夹、文档、普通图标、摘要卡和默认徽章改为暖中性表达。
+- **统一中文字体**：删除 Inter 三个静态字体，打包 Noto Sans SC 可变字体，以真实 400/500/600/700 字重统一中英文渲染；清除 CJK 额外字距，标题使用真实 Bold/SemiBold。
+- **页面视觉打磨**：首页/实例列表、登录、文件、搜索、设置、分享、任务中心和管理台页面同步使用新的颜色角色；当前实例长名称、URL 和徽章布局进一步收敛。
+- **品牌资产保持**：OpenList 官方蓝渐变 Logo 与启动图标背景保持不变。
+- **包体影响**：Noto Sans SC 字体资源显著大于原 Inter 字体，属于已确认的可读性取舍；实际 APK 大小记录见验收报告。
+- **versionCode = 10，versionName = "1.3.0"**。
+
+### 验收
+
+`compileDebugKotlin`、`testDebugUnitTest`、`assembleDebug` 已通过；生成的 Debug APK 已通过 `apkanalyzer` 与 `aapt` 交叉核对为 `io.openlist.client`、`versionCode=10`、`versionName=1.3.0`，大小为 84,314,009 字节（80.41 MiB）。设备端完整视觉观感复验保留为人工确认项，详见 [v1.3_ACCEPTANCE_REPORT.md](v1.3_ACCEPTANCE_REPORT.md)。
+
+---
+
 ## v1.2.0 — 全局 UI 紧凑化与空间化转场
 
 本版在 v1.1.1 功能面基础上完成跨页面 UI/UX 升级，不新增 API、DTO、Repository、Room 数据结构、权限、路由或运行时依赖。
