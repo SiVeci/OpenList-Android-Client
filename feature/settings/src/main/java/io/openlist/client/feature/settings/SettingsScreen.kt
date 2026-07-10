@@ -48,11 +48,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.openlist.client.core.designsystem.Spacing
+import io.openlist.client.core.designsystem.components.AppTopBar
 import io.openlist.client.core.designsystem.components.EntryRow
 import io.openlist.client.core.designsystem.components.GroupCard
-import io.openlist.client.core.designsystem.components.HeroHeader
-import io.openlist.client.core.designsystem.components.OpenListBrandLockup
-import io.openlist.client.core.designsystem.components.OpenListLogoSurface
 import io.openlist.client.core.designsystem.components.PlateTone
 import io.openlist.client.core.designsystem.components.StatusBadge
 import io.openlist.client.core.designsystem.components.StatusTone
@@ -108,19 +106,11 @@ fun SettingsScreen(
 
     Scaffold(
         topBar = {
-            HeroHeader(
+            AppTopBar(
                 title = "我的",
                 subtitle = currentInstanceName ?: "管理实例、会话与本地设置",
                 onBack = onBack,
-            ) {
-                OpenListBrandLockup(
-                    surface = OpenListLogoSurface.Dark,
-                    title = "我的",
-                    subtitle = currentInstanceName ?: "管理实例、会话与本地设置",
-                    markSize = 56.dp,
-                    titleStyle = MaterialTheme.typography.headlineMedium,
-                )
-            }
+            )
         },
     ) { padding ->
         Column(
@@ -128,8 +118,8 @@ fun SettingsScreen(
                 .padding(padding)
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(Spacing.md),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             ProfileCard(
                 instanceName = currentInstanceName,
@@ -364,7 +354,7 @@ private fun ProfileCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = Spacing.md),
+                .padding(top = Spacing.sm),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
@@ -388,7 +378,7 @@ private fun ProfileCard(
 private fun EntryAvatar(text: String) {
     Box(
         modifier = Modifier
-            .size(52.dp)
+            .size(44.dp)
             .background(MaterialTheme.colorScheme.primary, CircleShape),
         contentAlignment = Alignment.Center,
     ) {

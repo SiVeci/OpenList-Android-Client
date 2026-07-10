@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.openlist.client.core.designsystem.Spacing
 import io.openlist.client.core.designsystem.components.AppTextField
+import io.openlist.client.core.designsystem.components.DirectionalContent
 import io.openlist.client.core.designsystem.components.ErrorBar
 import io.openlist.client.core.designsystem.components.GroupCard
 import io.openlist.client.core.designsystem.components.HeroHeader
@@ -120,10 +121,16 @@ fun LoginScreen(
                             onSelectedIndexChange = { index -> viewModel.selectMethod(LoginMethod.entries[index]) },
                             enabled = !uiState.isSubmitting,
                         )
-                        when (uiState.method) {
-                            LoginMethod.PASSWORD -> CredentialsForm(uiState, viewModel, label = "密码")
-                            LoginMethod.LDAP -> CredentialsForm(uiState, viewModel, label = "LDAP 密码")
-                            LoginMethod.TOKEN -> TokenForm(uiState, viewModel)
+                        DirectionalContent(
+                            targetState = uiState.method.ordinal,
+                            direction = { from, to -> to - from },
+                            label = "loginMethodForm",
+                        ) { methodIndex ->
+                            when (LoginMethod.entries[methodIndex]) {
+                                LoginMethod.PASSWORD -> CredentialsForm(uiState, viewModel, label = "密码")
+                                LoginMethod.LDAP -> CredentialsForm(uiState, viewModel, label = "LDAP 密码")
+                                LoginMethod.TOKEN -> TokenForm(uiState, viewModel)
+                            }
                         }
                     }
                 }

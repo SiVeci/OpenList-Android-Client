@@ -53,7 +53,7 @@ fun ListRowItem(
             .fillMaxWidth()
             .background(if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surface)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+            .padding(horizontal = Spacing.md, vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
@@ -74,20 +74,16 @@ fun ListRowItem(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (sizeText != null || modifiedText != null) {
+            // Capability labels ("可预览"/"可播放") ride on the meta line instead
+            // of a chips row of their own, so every row stays two lines tall.
+            val metaParts = listOfNotNull(sizeText, modifiedText) + badges
+            if (metaParts.isNotEmpty()) {
                 Text(
-                    text = listOfNotNull(sizeText, modifiedText).joinToString("  ·  "),
+                    text = metaParts.joinToString("  ·  "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (badges.isNotEmpty()) {
-                CapabilityChips(
-                    labels = badges,
-                    tone = StatusTone.SUCCESS,
-                    modifier = Modifier.padding(top = Spacing.xxs),
                 )
             }
         }

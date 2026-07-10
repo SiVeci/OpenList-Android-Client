@@ -6,23 +6,18 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
 /**
  * Top bar shown while the file list is in batch-selection mode
- * (v0.2_EXECUTION_PLAN.md §13.7). [selectedCount] is rendered as a pill/badge
- * per DESIGN.md's badge language; delete uses the error tint so it stays
- * visually distinct from move/copy even at icon size.
+ * (v0.2_EXECUTION_PLAN.md §13.7). Rides on [AppTopBar] so it keeps the same
+ * compact 48dp height as the regular file-list header it swaps with; delete
+ * uses the error tint so it stays visually distinct from move/copy.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BatchSelectionTopBar(
     selectedCount: Int,
@@ -34,12 +29,10 @@ fun BatchSelectionTopBar(
     modifier: Modifier = Modifier,
     allSelected: Boolean = false,
 ) {
-    TopAppBar(
+    AppTopBar(
+        title = "已选 $selectedCount 项",
         modifier = modifier,
-        title = {
-            StatusBadge(text = "已选 $selectedCount 项", tone = StatusTone.PRIMARY)
-        },
-        navigationIcon = {
+        leading = {
             IconButton(onClick = onExit) {
                 Icon(Icons.Outlined.Close, contentDescription = "退出选择")
             }
@@ -61,15 +54,12 @@ fun BatchSelectionTopBar(
                 Icon(
                     Icons.Filled.Delete,
                     contentDescription = "删除",
-                    tint = if (selectedCount > 0) MaterialTheme.colorScheme.error else LocalContentColor(),
+                    tint = if (selectedCount > 0) MaterialTheme.colorScheme.error else disabledContentColor(),
                 )
             }
         },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-        ),
     )
 }
 
 @Composable
-private fun LocalContentColor() = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+private fun disabledContentColor() = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)

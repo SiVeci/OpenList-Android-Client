@@ -49,6 +49,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,6 +61,7 @@ import io.openlist.client.core.designsystem.Spacing
 import io.openlist.client.core.designsystem.components.AppTopBar
 import io.openlist.client.core.designsystem.components.ConfirmDialog
 import io.openlist.client.core.designsystem.components.DirectoryPickerSheet
+import io.openlist.client.core.designsystem.components.DirectionalContent
 import io.openlist.client.core.designsystem.components.EmptyState
 import io.openlist.client.core.designsystem.components.ErrorBar
 import io.openlist.client.core.designsystem.components.OfflineDownloadSheet
@@ -106,14 +109,17 @@ fun TaskCenterScreen(
 
     Scaffold(
         topBar = {
-            Column {
-                AppTopBar(title = "任务中心", onBack = onBack)
-                TaskTabRow(
-                    tabs = listOf("上传", "下载", "远程", "失败"),
-                    selectedIndex = TaskTab.entries.indexOf(uiState.selectedTab),
-                    onTabSelected = { index -> viewModel.selectTab(TaskTab.entries[index]) },
-                )
-            }
+            AppTopBar(
+                title = "任务中心",
+                onBack = onBack,
+                bottomRow = {
+                    TaskTabRow(
+                        tabs = listOf("上传", "下载", "远程", "失败"),
+                        selectedIndex = TaskTab.entries.indexOf(uiState.selectedTab),
+                        onTabSelected = { index -> viewModel.selectTab(TaskTab.entries[index]) },
+                    )
+                },
+            )
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { viewModel.openOfflineDownloadSheet() }) {
@@ -131,33 +137,50 @@ fun TaskCenterScreen(
                 onRefresh = { viewModel.refresh() },
                 modifier = Modifier.fillMaxSize(),
             ) {
-                val groups = uiState.taskGroups
-                if (groups.isEmpty()) {
-                    EmptyState(title = "暂无任务", modifier = Modifier.fillMaxSize())
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(Spacing.md),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    ) {
-                        item {
-                            TaskSummaryStrip(summary = uiState.summary)
-                        }
-                        groups.forEach { group ->
-                            item(key = "group-${group.type}") {
-                                TaskGroupHeader(
-                                    title = group.title,
-                                    actionLabel = group.type.actionLabel(),
-                                    onAction = { viewModel.openGroupActionConfirm(group.type) },
-                                )
+                // Snapshot per tab so the outgoing pane of the slide shows the
+                // tab the user is leaving, not the shared live state (which has
+                // already switched to the new tab's groups).
+                val tabSnapshots = remember { mutableStateMapOf<Int, List<TaskGroup>>() }
+                val selectedIndex = TaskTab.entries.indexOf(uiState.selectedTab)
+                SideEffect {
+                    if (tabSnapshots[selectedIndex] != uiState.taskGroups) {
+                        tabSnapshots[selectedIndex] = uiState.taskGroups
+                    }
+                }
+                DirectionalContent(
+                    targetState = selectedIndex,
+                    direction = { from, to -> to - from },
+                    modifier = Modifier.fillMaxSize(),
+                    label = "taskTabContent",
+                ) { tabIndex ->
+                    val groups = if (tabIndex == selectedIndex) uiState.taskGroups else tabSnapshots[tabIndex].orEmpty()
+                    if (groups.isEmpty()) {
+                        EmptyState(title = "暂无任务", modifier = Modifier.fillMaxSize())
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(horizontal = Spacing.md, vertical = Spacing.sm),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                        ) {
+                            item {
+                                TaskSummaryStrip(summary = uiState.summary)
                             }
-                            items(group.tasks, key = { it.id }) { task ->
-                                TaskRow(
-                                    task = task,
-                                    onCancel = { viewModel.openCancelConfirm(task) },
-                                    onRetry = { viewModel.retryTask(task) },
-                                    onOpenTarget = { viewModel.openTaskTarget(task, onOpenDirectory, onOpenFile) },
-                                )
+                            groups.forEach { group ->
+                                item(key = "group-${group.type}") {
+                                    TaskGroupHeader(
+                                        title = group.title,
+                                        actionLabel = group.type.actionLabel(),
+                                        onAction = { viewModel.openGroupActionConfirm(group.type) },
+                                    )
+                                }
+                                items(group.tasks, key = { it.id }) { task ->
+                                    TaskRow(
+                                        task = task,
+                                        onCancel = { viewModel.openCancelConfirm(task) },
+                                        onRetry = { viewModel.retryTask(task) },
+                                        onOpenTarget = { viewModel.openTaskTarget(task, onOpenDirectory, onOpenFile) },
+                                    )
+                                }
                             }
                         }
                     }

@@ -24,11 +24,11 @@ fun StatusBadge(
     val (background, content) = badgeColors(tone)
     Text(
         text = text,
-        style = MaterialTheme.typography.labelMedium,
+        style = MaterialTheme.typography.labelSmall,
         color = content,
         modifier = modifier
             .background(background, PillShape)
-            .padding(horizontal = Spacing.xs, vertical = Spacing.xxs),
+            .padding(horizontal = Spacing.xs, vertical = 2.dp),
     )
 }
 

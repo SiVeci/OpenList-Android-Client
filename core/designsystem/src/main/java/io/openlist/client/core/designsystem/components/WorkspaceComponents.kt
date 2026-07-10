@@ -90,13 +90,14 @@ fun QuickActionTile(
             .clickable(enabled = enabled, onClick = onClick)
             .padding(vertical = Spacing.xs),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
     ) {
         IconPlate(
             icon = icon,
             contentDescription = label,
             background = colors.background,
             content = if (enabled) colors.content else MaterialTheme.colorScheme.onSurfaceVariant,
+            size = 40.dp,
         )
         Text(
             text = label,
@@ -132,7 +133,7 @@ fun GroupCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(Spacing.md),
+                .padding(Spacing.sm),
             content = content,
         )
     }
@@ -159,7 +160,7 @@ fun EntryRow(
         modifier = modifier
             .fillMaxWidth()
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(vertical = Spacing.sm),
+            .padding(vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
@@ -168,7 +169,7 @@ fun EntryRow(
             contentDescription = null,
             background = colors.background,
             content = colors.content,
-            size = 52.dp,
+            size = 40.dp,
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(

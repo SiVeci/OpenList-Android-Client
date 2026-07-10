@@ -1,5 +1,17 @@
 package io.openlist.client.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Assignment
@@ -13,6 +25,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -34,6 +47,100 @@ import io.openlist.client.feature.share.ShareDetailScreen
 import io.openlist.client.feature.share.ShareListScreen
 import io.openlist.client.feature.share.ShareOpenScreen
 import io.openlist.client.feature.task.TaskCenterScreen
+
+// --- Navigation motion (2026-07) ---
+// One spatial rule instead of the navigation-compose default (a 700ms
+// symmetric crossfade for every navigation): new content comes from the side
+// its target sits on.
+//  * The four main tabs form an ordered horizontal band (home 0 · files 1 ·
+//    tasks 2 · mine 3): moving between them is a full-width lateral slide
+//    whose direction is the tab-index delta — regardless of whether the move
+//    came from the bottom bar, a home quick entry, or a system back.
+//  * Hierarchical push/pop uses shared-axis X (30% slide + fade), visually
+//    one level "floatier" than the tab band so depth reads differently from
+//    lateral movement.
+//  * Full-screen media routes scale+fade on the Z axis (lightbox feel).
+// Splash hands off with a quick fade so cold start doesn't sit in a crossfade.
+// In-page switches reuse the same direction rule via DirectionalContent.
+
+private val mainTabOrder = listOf(
+    Routes.INSTANCE_LIST,
+    Routes.FILE_LIST,
+    Routes.TASK_CENTER,
+    Routes.SETTINGS,
+)
+private val mediaRoutes = setOf(Routes.PREVIEW, Routes.MEDIA_PLAYER)
+
+private const val MotionDurationMs = 300
+private const val MotionFadeOutMs = 90
+private const val MotionFadeInMs = 210
+
+/** Tab-index delta for this transition, or null when either end is not a main tab. */
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabDelta(): Int? {
+    val from = mainTabOrder.indexOf(initialState.destination.route)
+    val to = mainTabOrder.indexOf(targetState.destination.route)
+    if (from < 0 || to < 0) return null
+    val delta = to - from
+    // A FILE_LIST→FILE_LIST move (recent-path jump while already on the files
+    // tab) still carries direction: deeper paths are forward, like the
+    // in-screen directory slide.
+    return if (delta == 0 && initialState.destination.route == Routes.FILE_LIST) {
+        pathArgDepth(targetState) - pathArgDepth(initialState)
+    } else {
+        delta
+    }
+}
+
+private fun pathArgDepth(entry: NavBackStackEntry): Int {
+    val raw = entry.arguments?.getString("path") ?: "/"
+    val decoded = runCatching { java.net.URLDecoder.decode(raw, "UTF-8") }.getOrDefault(raw)
+    return decoded.split('/').count { it.isNotEmpty() }
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.lateralTabEnter(delta: Int): EnterTransition =
+    when {
+        delta > 0 -> slideIntoContainer(
+            AnimatedContentTransitionScope.SlideDirection.Left,
+            tween(MotionDurationMs, easing = FastOutSlowInEasing),
+        )
+        delta < 0 -> slideIntoContainer(
+            AnimatedContentTransitionScope.SlideDirection.Right,
+            tween(MotionDurationMs, easing = FastOutSlowInEasing),
+        )
+        // Same-route jump (e.g. recent path while already on the files tab).
+        else -> fadeIn(tween(MotionFadeInMs, delayMillis = MotionFadeOutMs))
+    }
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.lateralTabExit(delta: Int): ExitTransition =
+    when {
+        delta > 0 -> slideOutOfContainer(
+            AnimatedContentTransitionScope.SlideDirection.Left,
+            tween(MotionDurationMs, easing = FastOutSlowInEasing),
+        )
+        delta < 0 -> slideOutOfContainer(
+            AnimatedContentTransitionScope.SlideDirection.Right,
+            tween(MotionDurationMs, easing = FastOutSlowInEasing),
+        )
+        else -> fadeOut(tween(MotionFadeOutMs))
+    }
+
+private fun sharedAxisEnter(pop: Boolean): EnterTransition =
+    slideInHorizontally(tween(MotionDurationMs, easing = FastOutSlowInEasing)) { fullWidth ->
+        (if (pop) -fullWidth else fullWidth) / 3
+    } + fadeIn(tween(MotionFadeInMs, delayMillis = MotionFadeOutMs))
+
+private fun sharedAxisExit(pop: Boolean): ExitTransition =
+    slideOutHorizontally(tween(MotionDurationMs, easing = FastOutSlowInEasing)) { fullWidth ->
+        (if (pop) fullWidth else -fullWidth) / 3
+    } + fadeOut(tween(MotionFadeOutMs))
+
+private fun mediaEnter(): EnterTransition =
+    fadeIn(tween(MotionDurationMs)) +
+        scaleIn(initialScale = 0.96f, animationSpec = tween(MotionDurationMs, easing = FastOutSlowInEasing))
+
+private fun mediaPopExit(): ExitTransition =
+    fadeOut(tween(MotionFadeInMs)) +
+        scaleOut(targetScale = 0.96f, animationSpec = tween(MotionFadeInMs, easing = FastOutSlowInEasing))
 
 @Composable
 fun OpenListNavHost(navController: NavHostController = rememberNavController()) {
@@ -92,7 +199,48 @@ fun OpenListNavHost(navController: NavHostController = rememberNavController()) 
         NavHost(
             navController = navController,
             startDestination = Routes.SPLASH,
-            modifier = Modifier.padding(innerPadding),
+            // consumeWindowInsets marks the insets covered by innerPadding as
+            // handled, so screens' own Scaffolds / statusBarsPadding resolve
+            // to zero instead of stacking a second (or third) status-bar
+            // height on top — the system-bar insets are applied exactly once,
+            // here.
+            modifier = Modifier
+                .padding(innerPadding)
+                .consumeWindowInsets(innerPadding),
+            enterTransition = {
+                val tabDelta = tabDelta()
+                when {
+                    initialState.destination.route == Routes.SPLASH -> fadeIn(tween(150))
+                    targetState.destination.route in mediaRoutes -> mediaEnter()
+                    tabDelta != null -> lateralTabEnter(tabDelta)
+                    else -> sharedAxisEnter(pop = false)
+                }
+            },
+            exitTransition = {
+                val tabDelta = tabDelta()
+                when {
+                    initialState.destination.route == Routes.SPLASH -> fadeOut(tween(150))
+                    targetState.destination.route in mediaRoutes -> fadeOut(tween(MotionFadeInMs))
+                    tabDelta != null -> lateralTabExit(tabDelta)
+                    else -> sharedAxisExit(pop = false)
+                }
+            },
+            popEnterTransition = {
+                val tabDelta = tabDelta()
+                when {
+                    initialState.destination.route in mediaRoutes -> fadeIn(tween(MotionDurationMs))
+                    tabDelta != null -> lateralTabEnter(tabDelta)
+                    else -> sharedAxisEnter(pop = true)
+                }
+            },
+            popExitTransition = {
+                val tabDelta = tabDelta()
+                when {
+                    initialState.destination.route in mediaRoutes -> mediaPopExit()
+                    tabDelta != null -> lateralTabExit(tabDelta)
+                    else -> sharedAxisExit(pop = true)
+                }
+            },
         ) {
         composable(Routes.SPLASH) {
             SplashScreen(onNavigate = { route, popSplash ->

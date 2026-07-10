@@ -4,7 +4,17 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,7 +28,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DriveFileMove
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Checklist
@@ -28,7 +37,6 @@ import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.FileCopy
-import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
@@ -63,6 +71,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -73,9 +83,11 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.openlist.client.core.designsystem.Spacing
+import io.openlist.client.core.designsystem.components.AppTopBar
 import io.openlist.client.core.designsystem.components.BatchSelectionTopBar
 import io.openlist.client.core.designsystem.components.Breadcrumb
 import io.openlist.client.core.designsystem.components.ConfirmDialog
+import io.openlist.client.core.designsystem.components.DirectionalContent
 import io.openlist.client.core.designsystem.components.DirectoryPickerSheet
 import io.openlist.client.core.designsystem.components.EmptyState
 import io.openlist.client.core.designsystem.components.ErrorBar
@@ -83,7 +95,6 @@ import io.openlist.client.core.designsystem.components.FileActionItem
 import io.openlist.client.core.designsystem.components.FileActionSheet
 import io.openlist.client.core.designsystem.components.fileKindIcon
 import io.openlist.client.core.designsystem.components.fileKindOf
-import io.openlist.client.core.designsystem.components.GroupCard
 import io.openlist.client.core.designsystem.components.ListRowItem
 import io.openlist.client.core.designsystem.components.LoadingState
 import io.openlist.client.core.designsystem.components.ShareFormSheet
@@ -140,28 +151,36 @@ fun FileListScreen(
 
     Scaffold(
         topBar = {
-            if (uiState.selectionMode) {
-                BatchSelectionTopBar(
-                    selectedCount = uiState.selectedPaths.size,
-                    allSelected = uiState.allSelected,
-                    onExit = { viewModel.exitSelectionMode() },
-                    onToggleSelectAll = { viewModel.toggleSelectAll() },
-                    onDelete = { viewModel.openBatchDeleteConfirm() },
-                    onMove = { viewModel.openBatchMovePicker() },
-                    onCopy = { viewModel.openBatchCopyPicker() },
-                )
-            } else {
-                FileListHeader(
-                    uiState = uiState,
-                    onBack = onBackToInstances,
-                    onOpenSearch = { onOpenSearch(uiState.currentPath) },
-                    onOpenShareList = onOpenShareList,
-                    onOpenTaskCenter = onOpenTaskCenter,
-                    onOpenUploadPanel = { viewModel.openUploadPanel() },
-                    onUpload = { uploadPickerLauncher.launch(arrayOf("*/*")) },
-                    onNewFolder = { viewModel.openNewFolderDialog() },
-                    onSegmentClick = { index -> viewModel.navigateToSegmentCount(index) },
-                )
+            // Contextual top-bar swap (normal ↔ batch selection): unordered
+            // switch, so a quick crossfade per the motion spec.
+            Crossfade(
+                targetState = uiState.selectionMode,
+                animationSpec = tween(150),
+                label = "fileTopBar",
+            ) { selectionMode ->
+                if (selectionMode) {
+                    BatchSelectionTopBar(
+                        selectedCount = uiState.selectedPaths.size,
+                        allSelected = uiState.allSelected,
+                        onExit = { viewModel.exitSelectionMode() },
+                        onToggleSelectAll = { viewModel.toggleSelectAll() },
+                        onDelete = { viewModel.openBatchDeleteConfirm() },
+                        onMove = { viewModel.openBatchMovePicker() },
+                        onCopy = { viewModel.openBatchCopyPicker() },
+                    )
+                } else {
+                    FileListHeader(
+                        uiState = uiState,
+                        onBack = onBackToInstances,
+                        onOpenSearch = { onOpenSearch(uiState.currentPath) },
+                        onOpenShareList = onOpenShareList,
+                        onOpenTaskCenter = onOpenTaskCenter,
+                        onOpenUploadPanel = { viewModel.openUploadPanel() },
+                        onUpload = { uploadPickerLauncher.launch(arrayOf("*/*")) },
+                        onNewFolder = { viewModel.openNewFolderDialog() },
+                        onSegmentClick = { index -> viewModel.navigateToSegmentCount(index) },
+                    )
+                }
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -172,8 +191,21 @@ fun FileListScreen(
                 onRefresh = { viewModel.refresh() },
                 onSortChange = { key, direction -> viewModel.updateSort(key, direction) },
             )
-            uiState.errorMessage?.let { message ->
-                ErrorBar(message = message, onRetry = { viewModel.refresh() })
+            // The banner expands/shrinks instead of popping in and out: an
+            // instant height change here shifts the whole list area vertically
+            // and reads as a "float" when it overlaps the directory slide.
+            var lastErrorMessage by remember { mutableStateOf<String?>(null) }
+            if (uiState.errorMessage != null && lastErrorMessage != uiState.errorMessage) {
+                lastErrorMessage = uiState.errorMessage
+            }
+            AnimatedVisibility(
+                visible = uiState.errorMessage != null,
+                enter = expandVertically(tween(150)) + fadeIn(tween(150)),
+                exit = shrinkVertically(tween(150)) + fadeOut(tween(150)),
+            ) {
+                lastErrorMessage?.let { message ->
+                    ErrorBar(message = message, onRetry = { viewModel.refresh() })
+                }
             }
             Box(modifier = Modifier.fillMaxSize()) {
                 PullToRefreshBox(
@@ -181,37 +213,75 @@ fun FileListScreen(
                     onRefresh = { viewModel.refresh() },
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    when {
-                        uiState.isLoading -> LoadingState(modifier = Modifier.fillMaxSize())
-                        uiState.nodes.isEmpty() -> EmptyState(
-                            title = "此目录为空",
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                        else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
-                            items(uiState.nodes, key = { it.path }) { node ->
-                                ListRowItem(
-                                    name = node.name,
-                                    isDir = node.isDir,
-                                    sizeText = if (node.isDir) null else formatSize(node.size),
-                                    modifiedText = node.modifiedAt?.let(::formatDate),
-                                    badges = abilityBadges(node),
-                                    selectionMode = uiState.selectionMode,
-                                    selected = node.path in uiState.selectedPaths,
-                                    onClick = { viewModel.onNodeClick(node, onOpenFileDetail, onOpenFile) },
-                                    onLongClick = if (uiState.canWrite && !uiState.selectionMode) {
-                                        { viewModel.enterSelectionMode(node) }
-                                    } else {
-                                        null
-                                    },
-                                    trailing = {
-                                        if (!uiState.selectionMode) {
-                                            IconButton(onClick = { viewModel.openActionSheet(node) }) {
-                                                Icon(Icons.Filled.MoreVert, contentDescription = "更多")
+                    // Directory browsing is in-screen ViewModel state, not a
+                    // navigation event, so the spatial rule is applied here:
+                    // deeper paths slide in full-width from the right, going
+                    // up from the left. Panes for paths other than the live
+                    // one render a frozen snapshot — the shared uiState has
+                    // already moved on to the new directory by the time the
+                    // outgoing pane animates, and without the snapshot both
+                    // panes would show identical (new) content.
+                    val paneSnapshots = remember { mutableStateMapOf<String, DirectoryPane>() }
+                    val livePane = DirectoryPane(uiState.isLoading, uiState.nodes)
+                    SideEffect {
+                        // Only settled states are worth freezing: a loading
+                        // pane snapshot would defeat the stale-while-revalidate
+                        // fallback below.
+                        if (!livePane.isLoading && paneSnapshots[uiState.currentPath] != livePane) {
+                            paneSnapshots[uiState.currentPath] = livePane
+                        }
+                        if (paneSnapshots.size > 8) {
+                            paneSnapshots.keys.retainAll(setOf(uiState.currentPath))
+                        }
+                    }
+                    DirectionalContent(
+                        targetState = uiState.currentPath,
+                        direction = { from, to -> pathDepth(to) - pathDepth(from) },
+                        modifier = Modifier.fillMaxSize(),
+                        label = "directoryContent",
+                        fullWidth = true,
+                    ) { panePath ->
+                        // Stale-while-revalidate: while the live pane is still
+                        // loading, keep showing the path's previous rows so the
+                        // incoming side of the slide doesn't flash a centered
+                        // spinner that then jumps to a top-aligned list.
+                        val pane = if (panePath == uiState.currentPath) {
+                            if (livePane.isLoading) paneSnapshots[panePath] ?: livePane else livePane
+                        } else {
+                            paneSnapshots[panePath]
+                        }
+                        when {
+                            pane == null || pane.isLoading -> LoadingState(modifier = Modifier.fillMaxSize())
+                            pane.nodes.isEmpty() -> EmptyState(
+                                title = "此目录为空",
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                            else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
+                                items(pane.nodes, key = { it.path }) { node ->
+                                    ListRowItem(
+                                        name = node.name,
+                                        isDir = node.isDir,
+                                        sizeText = if (node.isDir) null else formatSize(node.size),
+                                        modifiedText = node.modifiedAt?.let(::formatDate),
+                                        badges = abilityBadges(node),
+                                        selectionMode = uiState.selectionMode,
+                                        selected = node.path in uiState.selectedPaths,
+                                        onClick = { viewModel.onNodeClick(node, onOpenFileDetail, onOpenFile) },
+                                        onLongClick = if (uiState.canWrite && !uiState.selectionMode) {
+                                            { viewModel.enterSelectionMode(node) }
+                                        } else {
+                                            null
+                                        },
+                                        trailing = {
+                                            if (!uiState.selectionMode) {
+                                                IconButton(onClick = { viewModel.openActionSheet(node) }) {
+                                                    Icon(Icons.Filled.MoreVert, contentDescription = "更多")
+                                                }
                                             }
-                                        }
-                                    },
-                                )
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                        },
+                                    )
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                }
                             }
                         }
                     }
@@ -374,37 +444,11 @@ private fun FileListHeader(
     onNewFolder: () -> Unit,
     onSegmentClick: (Int) -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回实例")
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = uiState.instanceName.ifBlank { "OpenList" },
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = if (uiState.isGuest) "游客访问" else "已登录",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+    AppTopBar(
+        title = uiState.instanceName.ifBlank { "OpenList" },
+        subtitle = if (uiState.isGuest) "游客访问" else "已登录",
+        onBack = onBack,
+        actions = {
             IconButton(onClick = onOpenSearch) {
                 Icon(Icons.Filled.Search, contentDescription = "搜索")
             }
@@ -441,23 +485,15 @@ private fun FileListHeader(
                     Icon(Icons.Filled.CreateNewFolder, contentDescription = "新建目录")
                 }
             }
-        }
-        GroupCard {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Filled.FolderOpen,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp),
-                )
-                Breadcrumb(
-                    segments = listOf("根目录") + OpenListPathCodec.segments(uiState.currentPath),
-                    onSegmentClick = onSegmentClick,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-    }
+        },
+        bottomRow = {
+            Breadcrumb(
+                segments = listOf("根目录") + OpenListPathCodec.segments(uiState.currentPath),
+                onSegmentClick = onSegmentClick,
+                modifier = Modifier.padding(bottom = Spacing.xxs),
+            )
+        },
+    )
 }
 
 @Composable
@@ -467,10 +503,14 @@ private fun FileListRefreshStrip(
     onSortChange: (FileSortKey, SortDirection) -> Unit,
 ) {
     var showSortMenu by remember { mutableStateOf(false) }
+    // Meta strip kept to 36dp: the refresh/sort text buttons fill the row
+    // height so their touch area is the full strip, not a 48dp default that
+    // would stretch it.
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+            .height(36.dp)
+            .padding(horizontal = Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) {
@@ -478,7 +518,7 @@ private fun FileListRefreshStrip(
             imageVector = Icons.Filled.Refresh,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(18.dp),
         )
         Text(
             text = refreshLabel(uiState),
@@ -488,11 +528,20 @@ private fun FileListRefreshStrip(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        TextButton(onClick = onRefresh, enabled = !uiState.isRefreshing) {
+        TextButton(
+            onClick = onRefresh,
+            enabled = !uiState.isRefreshing,
+            modifier = Modifier.fillMaxHeight(),
+            contentPadding = PaddingValues(horizontal = Spacing.sm),
+        ) {
             Text(if (uiState.isRefreshing) "刷新中" else "刷新")
         }
-        Box {
-            TextButton(onClick = { showSortMenu = true }) {
+        Box(modifier = Modifier.fillMaxHeight()) {
+            TextButton(
+                onClick = { showSortMenu = true },
+                modifier = Modifier.fillMaxHeight(),
+                contentPadding = PaddingValues(horizontal = Spacing.sm),
+            ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Sort,
                     contentDescription = null,
@@ -529,6 +578,11 @@ private fun FileListRefreshStrip(
         }
     }
 }
+
+private fun pathDepth(path: String): Int = path.split('/').count { it.isNotEmpty() }
+
+/** Frozen render state for one directory pane of the slide animation. */
+private data class DirectoryPane(val isLoading: Boolean, val nodes: List<FileNode>)
 
 private fun refreshLabel(uiState: FileListUiState): String {
     val timestamp = uiState.lastRefreshTimestampMillis ?: return if (uiState.fromCache) "当前为本地缓存数据" else "下拉或点按刷新"

@@ -185,7 +185,12 @@ class FileListViewModel @Inject constructor(
                     directoryCapability = if (isSamePath) it.directoryCapability else DirectoryCapability.UNKNOWN,
                     isLoading = !isSamePath || it.nodes.isEmpty(),
                     isRefreshing = forceRefresh,
-                    errorMessage = null,
+                    // errorMessage deliberately NOT reset: clearing it here made
+                    // the error banner collapse the instant a directory slide
+                    // started, only to re-expand when the (still failing)
+                    // refresh came back — a vertical jump layered on the
+                    // lateral motion. The banner persists until the new path's
+                    // own Fresh/Error result overwrites it.
                 )
             }
             filesRepository.listDirectory(instanceId, normalized, forceRefresh).collect { result ->

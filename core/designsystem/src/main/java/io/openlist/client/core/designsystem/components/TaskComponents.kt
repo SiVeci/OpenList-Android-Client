@@ -91,7 +91,7 @@ fun TaskCard(
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(Spacing.md)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(Spacing.sm)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Column(modifier = Modifier.weight(1f)) {
@@ -151,7 +151,7 @@ fun TaskTabRow(
                 modifier = Modifier
                     .weight(1f)
                     .clickable { onTabSelected(index) }
-                    .padding(vertical = Spacing.sm),
+                    .padding(vertical = Spacing.xs),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(

@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.openlist.client.core.designsystem.components.AdminTabRow
 import io.openlist.client.core.designsystem.components.AppTopBar
+import io.openlist.client.core.designsystem.components.DirectionalContent
 import io.openlist.client.core.designsystem.components.EmptyState
 import io.openlist.client.core.designsystem.components.LoadingState
 import io.openlist.client.core.model.AdminAccessState
@@ -137,28 +138,34 @@ private fun AdminScaffold(
                 onTabSelected = { index -> onSelectTab(AdminTab.entries[index]) },
             )
             HorizontalDivider()
-            when (uiState.selectedTab) {
-                AdminTab.OVERVIEW -> AdminOverviewTab(
-                    uiState = uiState,
-                    onLoadOverviewCards = onLoadOverviewCards,
-                    onRetryStorage = onRetryStorage,
-                    onRetryTask = onRetryTask,
-                    onRetryIndex = onRetryIndex,
-                )
-                AdminTab.USERS -> AdminUserTab(instanceId = instanceId)
-                AdminTab.STORAGES -> AdminStorageTab(instanceId = instanceId)
-                AdminTab.TASKS -> AdminTaskTab(instanceId = instanceId)
-                AdminTab.INDEX -> AdminIndexTab(instanceId = instanceId)
-                AdminTab.SETTINGS -> AdminSettingsTab(
-                    instanceId = instanceId,
-                    webFallback = uiState.overviewWebFallback,
-                    onLoadWebFallback = onLoadWebFallback,
-                )
-                AdminTab.ADVANCED -> AdminAdvancedTab(
-                    webFallback = uiState.overviewWebFallback,
-                    onLoadWebFallback = onLoadWebFallback,
-                    onRetryWebFallback = onLoadWebFallback,
-                )
+            DirectionalContent(
+                targetState = AdminTab.entries.indexOf(uiState.selectedTab),
+                direction = { from, to -> to - from },
+                label = "adminTabContent",
+            ) { tabIndex ->
+                when (AdminTab.entries[tabIndex]) {
+                    AdminTab.OVERVIEW -> AdminOverviewTab(
+                        uiState = uiState,
+                        onLoadOverviewCards = onLoadOverviewCards,
+                        onRetryStorage = onRetryStorage,
+                        onRetryTask = onRetryTask,
+                        onRetryIndex = onRetryIndex,
+                    )
+                    AdminTab.USERS -> AdminUserTab(instanceId = instanceId)
+                    AdminTab.STORAGES -> AdminStorageTab(instanceId = instanceId)
+                    AdminTab.TASKS -> AdminTaskTab(instanceId = instanceId)
+                    AdminTab.INDEX -> AdminIndexTab(instanceId = instanceId)
+                    AdminTab.SETTINGS -> AdminSettingsTab(
+                        instanceId = instanceId,
+                        webFallback = uiState.overviewWebFallback,
+                        onLoadWebFallback = onLoadWebFallback,
+                    )
+                    AdminTab.ADVANCED -> AdminAdvancedTab(
+                        webFallback = uiState.overviewWebFallback,
+                        onLoadWebFallback = onLoadWebFallback,
+                        onRetryWebFallback = onLoadWebFallback,
+                    )
+                }
             }
         }
     }

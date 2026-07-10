@@ -6,14 +6,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -53,10 +53,11 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.openlist.client.core.designsystem.PillShape
 import io.openlist.client.core.designsystem.Spacing
+import io.openlist.client.core.designsystem.components.AppTopBar
 import io.openlist.client.core.designsystem.components.EmptyState
 import io.openlist.client.core.designsystem.components.GroupCard
 import io.openlist.client.core.designsystem.components.InstanceSwitcherChip
-import io.openlist.client.core.designsystem.components.OpenListBrandLockup
+import io.openlist.client.core.designsystem.components.OpenListLogoMark
 import io.openlist.client.core.designsystem.components.OpenListLogoSurface
 import io.openlist.client.core.designsystem.components.PlateTone
 import io.openlist.client.core.designsystem.components.PrimaryButton
@@ -98,19 +99,23 @@ fun InstanceListScreen(
     var pendingDelete by remember { mutableStateOf<Instance?>(null) }
     var showInstanceSwitcher by remember { mutableStateOf(false) }
 
-    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            HomeTopBar(
+                currentInstance = homeUiState.currentInstance,
+                onOpenSettings = onOpenSettings,
+                onAddInstance = onAddInstance,
+                onSwitchInstance = { showInstanceSwitcher = true },
+            )
+        },
+    ) { padding ->
         if (instances.isEmpty()) {
             Column(
                 modifier = Modifier
                     .padding(padding)
                     .fillMaxSize(),
             ) {
-                HomeHeaderSection(
-                    currentInstance = null,
-                    onOpenSettings = onOpenSettings,
-                    onAddInstance = onAddInstance,
-                    onSwitchInstance = { showInstanceSwitcher = true },
-                )
                 EmptyState(
                     title = "还没有添加实例",
                     description = "添加一个 OpenList 实例地址即可开始浏览文件。",
@@ -121,16 +126,9 @@ fun InstanceListScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.padding(padding),
-                verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                contentPadding = PaddingValues(top = Spacing.sm, bottom = Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
-                item {
-                    HomeHeaderSection(
-                        currentInstance = homeUiState.currentInstance,
-                        onOpenSettings = onOpenSettings,
-                        onAddInstance = onAddInstance,
-                        onSwitchInstance = { showInstanceSwitcher = true },
-                    )
-                }
                 item {
                     HomeSearchEntry(
                         enabled = homeUiState.currentInstance != null,
@@ -228,39 +226,36 @@ fun InstanceListScreen(
 }
 
 @Composable
-private fun HomeHeaderSection(
+private fun HomeTopBar(
     currentInstance: Instance?,
     onOpenSettings: () -> Unit,
     onAddInstance: () -> Unit,
     onSwitchInstance: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(horizontal = Spacing.md, vertical = Spacing.md),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        OpenListBrandLockup(
-            surface = OpenListLogoSurface.Light,
-            markSize = 36.dp,
-            titleStyle = MaterialTheme.typography.headlineSmall,
-        )
-        InstanceSwitcherChip(
-            label = currentInstance?.name ?: "选择实例",
-            onClick = onSwitchInstance,
-            enabled = currentInstance != null,
-            modifier = Modifier.weight(1f, fill = false),
-        )
-        Spacer(modifier = Modifier.weight(1f))
-        IconButton(onClick = onOpenSettings) {
-            Icon(Icons.Outlined.Settings, contentDescription = "设置")
-        }
-        IconButton(onClick = onAddInstance) {
-            Icon(Icons.Outlined.Add, contentDescription = "添加实例")
-        }
-    }
+    AppTopBar(
+        title = "OpenList",
+        leading = {
+            OpenListLogoMark(
+                surface = OpenListLogoSurface.Light,
+                size = 24.dp,
+                modifier = Modifier.padding(start = Spacing.xs),
+            )
+        },
+        actions = {
+            InstanceSwitcherChip(
+                label = currentInstance?.name ?: "选择实例",
+                onClick = onSwitchInstance,
+                enabled = currentInstance != null,
+                modifier = Modifier.widthIn(max = 150.dp),
+            )
+            IconButton(onClick = onOpenSettings) {
+                Icon(Icons.Outlined.Settings, contentDescription = "设置")
+            }
+            IconButton(onClick = onAddInstance) {
+                Icon(Icons.Outlined.Add, contentDescription = "添加实例")
+            }
+        },
+    )
 }
 
 @Composable
@@ -275,7 +270,7 @@ private fun HomeSearchEntry(
             .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.large)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.large)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = Spacing.md, vertical = Spacing.md),
+            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
@@ -283,7 +278,7 @@ private fun HomeSearchEntry(
             imageVector = Icons.Outlined.Search,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(28.dp),
+            modifier = Modifier.size(22.dp),
         )
         Text(
             text = "搜索文件、路径或分享",
@@ -315,11 +310,10 @@ private fun HomeActionsSection(
     modifier: Modifier = Modifier,
 ) {
     GroupCard(modifier = modifier) {
-        SectionHeader(title = "快速入口")
+        // The four tiles are self-labelled; a "快速入口" section header on top
+        // of them was pure chrome (density pass, 2026-07).
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = Spacing.sm),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             HomeActionTile(
@@ -435,7 +429,7 @@ private fun InstanceSwitcherRow(
     ) {
         Box(
             modifier = Modifier
-                .size(48.dp)
+                .size(40.dp)
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), MaterialTheme.shapes.large),
             contentAlignment = Alignment.Center,
         ) {
@@ -443,6 +437,7 @@ private fun InstanceSwitcherRow(
                 imageVector = Icons.Outlined.Folder,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
             )
         }
         Column(modifier = Modifier.weight(1f)) {
@@ -527,13 +522,13 @@ private fun RecentPathRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = Spacing.sm),
+            .padding(vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         Box(
             modifier = Modifier
-                .size(52.dp)
+                .size(40.dp)
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), MaterialTheme.shapes.large),
             contentAlignment = Alignment.Center,
         ) {
@@ -541,6 +536,7 @@ private fun RecentPathRow(
                 imageVector = Icons.Outlined.Folder,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
             )
         }
         Column(modifier = Modifier.weight(1f)) {
@@ -628,6 +624,10 @@ private fun InstanceRow(
     onTestConnection: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    // Density pass (2026-07): the whole row IS the "进入" affordance (the old
+    // trailing TextButton duplicated it); test/delete sit inline at the row
+    // end, and the four stacked meta lines collapsed into name-line badges +
+    // one "url · 最近访问" line, taking the row from ~112dp to ~64dp.
     val rowShape = MaterialTheme.shapes.large
     Row(
         modifier = Modifier
@@ -641,13 +641,14 @@ private fun InstanceRow(
                     Modifier
                 },
             )
-            .padding(horizontal = Spacing.sm, vertical = Spacing.sm),
+            .clickable(onClick = onClick)
+            .padding(horizontal = Spacing.xs, vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         Box(
             modifier = Modifier
-                .size(52.dp)
+                .size(40.dp)
                 .background(
                     if (instance.isCurrent) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                     else MaterialTheme.colorScheme.surfaceVariant,
@@ -659,47 +660,46 @@ private fun InstanceRow(
                 imageVector = Icons.Outlined.Storage,
                 contentDescription = null,
                 tint = if (instance.isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
             )
         }
         Column(modifier = Modifier.weight(1f)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
                     text = instance.name,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
                 if (instance.isCurrent) {
                     StatusBadge(text = "当前", tone = StatusTone.PRIMARY)
                 }
             }
-            Text(
-                text = instance.baseUrl,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = "最近访问 ${formatTimestamp(instance.lastUsedAt)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "${instance.baseUrl} · 最近 ${formatTimestamp(instance.lastUsedAt)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
                 LoginStatusLabel(session)
                 ConnectionStatusLabel(connectionCheck)
             }
         }
-        Column(horizontalAlignment = Alignment.End) {
-            Row {
-                IconButton(onClick = onTestConnection) {
-                    Icon(Icons.Outlined.Refresh, contentDescription = "测试连接")
-                }
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Outlined.DeleteOutline, contentDescription = "删除实例")
-                }
-            }
-            TextButton(onClick = onClick) { Text("进入") }
+        IconButton(onClick = onTestConnection) {
+            Icon(Icons.Outlined.Refresh, contentDescription = "测试连接", modifier = Modifier.size(20.dp))
+        }
+        IconButton(onClick = onDelete) {
+            Icon(Icons.Outlined.DeleteOutline, contentDescription = "删除实例", modifier = Modifier.size(20.dp))
         }
     }
 }

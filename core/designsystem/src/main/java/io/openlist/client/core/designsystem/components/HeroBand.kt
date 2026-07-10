@@ -1,6 +1,5 @@
 package io.openlist.client.core.designsystem.components
 
-import android.app.Activity
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -11,7 +10,6 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.Icon
@@ -21,24 +19,23 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.core.view.WindowCompat
 import io.openlist.client.core.designsystem.OpenListPalette
 import io.openlist.client.core.designsystem.Spacing
 
 /**
  * Navy hero band for entry screens (DESIGN.md hero-band-dark): brand-navy
- * background bleeding behind the status bar, on-dark headline/subtitle, and
- * the scattered sticky-note dot decoration in the brand color spectrum.
+ * background, on-dark headline/subtitle, and the scattered sticky-note dot
+ * decoration in the brand color spectrum. The band sits below the status
+ * bar (the inset is applied once, globally, by OpenListNavHost), so it must
+ * not add its own inset padding or force light status-bar icons.
  */
 @Composable
 fun HeroHeader(
@@ -63,25 +60,10 @@ fun HeroHeader(
         }
     },
 ) {
-    // The band is dark in both themes; force light status bar icons while it
-    // is on screen and restore the previous appearance when it leaves.
-    val view = LocalView.current
-    if (!view.isInEditMode) {
-        DisposableEffect(view) {
-            val window = (view.context as? Activity)?.window
-            val controller = window?.let { WindowCompat.getInsetsController(it, view) }
-            val wasLight = controller?.isAppearanceLightStatusBars
-            controller?.isAppearanceLightStatusBars = false
-            onDispose { if (wasLight != null) controller.isAppearanceLightStatusBars = wasLight }
-        }
-    }
-
     Box(modifier = modifier.fillMaxWidth().background(OpenListPalette.BrandNavy)) {
         StickyNoteDots(Modifier.matchParentSize())
         Column(
-            modifier = Modifier
-                .statusBarsPadding()
-                .padding(bottom = Spacing.lg),
+            modifier = Modifier.padding(bottom = Spacing.lg),
         ) {
             Row(
                 modifier = Modifier
