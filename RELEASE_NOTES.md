@@ -1,5 +1,24 @@
 # Release Notes
 
+## v1.2.0 — 全局 UI 紧凑化与空间化转场
+
+本版在 v1.1.1 功能面基础上完成跨页面 UI/UX 升级，不新增 API、DTO、Repository、Room 数据结构、权限、路由或运行时依赖。
+
+### 新增与调整
+
+- **紧凑化布局**：统一 48dp 顶栏与 52dp 底栏；缩小图标底板、卡片内边距、行距和状态标签，压缩文件行、首页实例行和“我的”页布局。
+- **系统栏稳定性**：修复 NavHost 系统栏 inset 重复叠加；批量选择栏与常规文件顶栏等高；移除“我的”页大 Hero，修复浅色状态栏图标可见性。
+- **空间化转场**：主 Tab 按位置横向滑动，层级页面使用 Shared Axis X，媒体页使用缩放淡入，Splash 使用快速淡入淡出；任务/管理台子 Tab、登录方式分段与批量状态同步接入方向动画。
+- **文件浏览稳定性**：目录切换使用路径快照和整宽滑动；错误栏改为纵向动画，避免加载和错误状态导致列表纵向跳动。
+- **系统返回**：启用 Android 预测式返回回调。
+- **versionCode = 9，versionName = "1.2.0"**。
+
+### 验收
+
+`compileDebugKotlin`、`testDebugUnitTest`、`assembleDebug` 已通过；生成的 Debug APK 已实测为 `versionCode=9`、`versionName=1.2.0`。设备端完整视觉观感复验保留为人工确认项，详见 [v1.2_ACCEPTANCE_REPORT.md](v1.2_ACCEPTANCE_REPORT.md)。
+
+---
+
 ## v1.1.1 — 视觉资源与构建补丁
 
 本补丁延续 v1.1 功能范围，不新增业务功能、权限、路由、API、DTO、Repository 或 Room 结构。
