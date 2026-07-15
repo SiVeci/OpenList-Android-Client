@@ -12,9 +12,10 @@
 | v1.1.1 | N/A (v1.1 patch) | [Done](docs/plans/2026-07-09-logo-replacement-execution-plan.md) | Done | [Done](docs/plans/2026-07-09-logo-replacement-acceptance.md) | Completed |
 | v1.2 | [Done](v1.2_PRD.md) | [Done](v1.2_EXECUTION_PLAN.md) | Done | [Accepted with manual-verification caveat](v1.2_ACCEPTANCE_REPORT.md) | Completed |
 | v1.3 | [Done](v1.3_PRD.md) | [Done](v1.3_EXECUTION_PLAN.md) | Done | [Accepted with manual-verification caveat](v1.3_ACCEPTANCE_REPORT.md) | Completed |
+| v1.4 | [Done](v1.4_PRD.md) | [Done](v1.4_EXECUTION_PLAN.md) | Done | [Accepted with verification caveats and user-approved third-party waiver](v1.4_ACCEPTANCE_REPORT.md) | Completed |
 
 Current latest completed version:
-- v1.3.0 (versionCode=10, versionName="1.3.0")
+- v1.4.0 (versionCode=11, versionName="1.4.0")
 
 Current active version:
-- None. v1.3.0 已完成，作为 v1.2.0 后的产品级中性配色与统一中文字体体系版本；详见 `v1.3_PRD.md`、`v1.3_EXECUTION_PLAN.md`、`v1.3_ACCEPTANCE_REPORT.md`。
+- None. v1.4.0 已完成，提供 Android 官方 DocumentsProvider/SAF 系统文件集成、强提交、恢复与任务中心联动；第三方 Files/WPS/Office/随机读写实操按用户指示豁免，详见 `v1.4_PRD.md`、`v1.4_EXECUTION_PLAN.md`、`v1.4_ACCEPTANCE_REPORT.md`。

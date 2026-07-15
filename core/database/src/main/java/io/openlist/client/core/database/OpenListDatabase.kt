@@ -12,6 +12,8 @@ import io.openlist.client.core.database.dao.RemoteTaskDao
 import io.openlist.client.core.database.dao.SearchHistoryDao
 import io.openlist.client.core.database.dao.SessionDao
 import io.openlist.client.core.database.dao.ShareDao
+import io.openlist.client.core.database.dao.SystemDocumentDao
+import io.openlist.client.core.database.dao.SystemWriteTransactionDao
 import io.openlist.client.core.database.dao.UploadTaskDao
 import io.openlist.client.core.database.entity.AdminCacheEntity
 import io.openlist.client.core.database.entity.DownloadTaskEntity
@@ -23,6 +25,8 @@ import io.openlist.client.core.database.entity.RemoteTaskEntity
 import io.openlist.client.core.database.entity.SearchHistoryEntity
 import io.openlist.client.core.database.entity.SessionEntity
 import io.openlist.client.core.database.entity.ShareEntity
+import io.openlist.client.core.database.entity.SystemDocumentEntity
+import io.openlist.client.core.database.entity.SystemWriteTransactionEntity
 import io.openlist.client.core.database.entity.UploadTaskEntity
 
 // v0.1.0 has shipped, so schema bumps from here on use hand-written Migrations
@@ -40,8 +44,10 @@ import io.openlist.client.core.database.entity.UploadTaskEntity
         PreviewCacheEntity::class,
         AdminCacheEntity::class,
         RecentPathEntity::class,
+        SystemDocumentEntity::class,
+        SystemWriteTransactionEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 abstract class OpenListDatabase : RoomDatabase() {
@@ -56,4 +62,6 @@ abstract class OpenListDatabase : RoomDatabase() {
     abstract fun previewCacheDao(): PreviewCacheDao
     abstract fun adminCacheDao(): AdminCacheDao
     abstract fun recentPathDao(): RecentPathDao
+    abstract fun systemDocumentDao(): SystemDocumentDao
+    abstract fun systemWriteTransactionDao(): SystemWriteTransactionDao
 }

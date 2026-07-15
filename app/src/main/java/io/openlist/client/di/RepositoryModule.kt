@@ -28,6 +28,7 @@ import io.openlist.client.core.domain.TaskAggregationRepository
 import io.openlist.client.core.domain.TaskRepository
 import io.openlist.client.core.domain.TransferRepository
 import io.openlist.client.core.domain.UploadRepository
+import io.openlist.client.core.domain.SystemDocumentsRepository
 import io.openlist.client.data.repository.AndroidMimeTypeResolver
 import io.openlist.client.data.repository.AdminGateRepositoryImpl
 import io.openlist.client.data.repository.AdminIndexRepositoryImpl
@@ -54,6 +55,11 @@ import io.openlist.client.data.repository.TaskAggregationRepositoryImpl
 import io.openlist.client.data.repository.TaskRepositoryImpl
 import io.openlist.client.data.repository.TransferRepositoryImpl
 import io.openlist.client.data.repository.UploadRepositoryImpl
+import io.openlist.client.data.repository.SystemDocumentsRepositoryImpl
+import io.openlist.client.data.repository.AndroidSystemDocumentVolume
+import io.openlist.client.data.repository.SystemDocumentVolume
+import io.openlist.client.data.repository.SystemDocumentLocalCommitter
+import io.openlist.client.data.repository.StrongSystemDocumentLocalCommitter
 import javax.inject.Singleton
 
 @Module
@@ -158,4 +164,16 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindAdminWebFallbackRepository(impl: AdminWebFallbackRepositoryImpl): AdminWebFallbackRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSystemDocumentsRepository(impl: SystemDocumentsRepositoryImpl): SystemDocumentsRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSystemDocumentVolume(impl: AndroidSystemDocumentVolume): SystemDocumentVolume
+
+    @Binds
+    @Singleton
+    abstract fun bindSystemDocumentLocalCommitter(impl: StrongSystemDocumentLocalCommitter): SystemDocumentLocalCommitter
 }

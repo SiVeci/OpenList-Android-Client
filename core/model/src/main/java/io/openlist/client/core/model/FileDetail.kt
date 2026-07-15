@@ -14,4 +14,6 @@ data class FileDetail(
     val sign: String,
     val rawUrl: String,
     val provider: String,
+    /** Backend-provided content hash metadata when the driver exposes it. */
+    val hashInfo: String = "",
 )

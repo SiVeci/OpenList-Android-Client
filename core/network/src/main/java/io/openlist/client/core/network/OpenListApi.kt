@@ -15,6 +15,7 @@ import io.openlist.client.core.network.dto.FsGetReq
 import io.openlist.client.core.network.dto.FsGetResp
 import io.openlist.client.core.network.dto.FsListReq
 import io.openlist.client.core.network.dto.FsListResp
+import io.openlist.client.core.network.dto.FsMutationTaskResponse
 import io.openlist.client.core.network.dto.LoginHashReq
 import io.openlist.client.core.network.dto.LoginReq
 import io.openlist.client.core.network.dto.LoginResp
@@ -115,6 +116,14 @@ interface OpenListApi {
     /** `data` carries `{message, tasks?}` on success; see [fsMove]. */
     @POST("api/fs/copy")
     suspend fun fsCopy(@Body req: MoveCopyReq): ApiResponse<JsonElement?>
+
+    /** v1.4 strong-completion route: callers inspect the task payload and
+     * wait for its terminal state rather than treating acceptance as success. */
+    @POST("api/fs/move")
+    suspend fun fsMoveForSystemDocument(@Body req: MoveCopyReq): ApiResponse<FsMutationTaskResponse>
+
+    @POST("api/fs/copy")
+    suspend fun fsCopyForSystemDocument(@Body req: MoveCopyReq): ApiResponse<FsMutationTaskResponse>
 
     /** `AuthNotGuest` — 403 for guest users (v0.3_EXECUTION_PLAN.md §6.1). */
     @GET("api/share/list")

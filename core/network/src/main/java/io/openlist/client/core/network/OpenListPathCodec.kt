@@ -14,6 +14,34 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
  */
 object OpenListPathCodec {
 
+    /** Provider-facing strict single path component validation. Unlike
+     * [normalize], this accepts no untrusted separators or traversal syntax. */
+    fun isSafeDocumentName(name: String): Boolean {
+        if (name.isBlank() || name == "." || name == ".." || name.indexOf('\u0000') >= 0) return false
+        if ('/' in name || '\\' in name) return false
+        // A percent-encoded slash/backslash would become a separator after a
+        // downstream decode, so reject it before any API request is formed.
+        return !Regex("(?i)%2f|%5c").containsMatchIn(name)
+    }
+
+    /** Strict path validation for data obtained from the local UUID mapping. */
+    fun isSafeNormalizedPath(path: String): Boolean {
+        if (!path.startsWith('/') || path.indexOf('\u0000') >= 0 || '\\' in path) return false
+        return path.split('/').drop(1).all { it.isEmpty() || (it != "." && it != ".." && !Regex("(?i)%2f|%5c").containsMatchIn(it)) }
+    }
+
+    /** True only when [childPath] is contained by [parentPath], including self. */
+    fun isWithin(parentPath: String, childPath: String): Boolean {
+        if (!isSafeNormalizedPath(parentPath) || !isSafeNormalizedPath(childPath)) return false
+        val parent = normalize(parentPath)
+        val child = normalize(childPath)
+        return parent == "/" || child == parent || child.startsWith("$parent/")
+    }
+
+    /** Provider-only safe join for a name that originated outside this app. */
+    fun safeChild(parent: String, childName: String): String? =
+        if (isSafeNormalizedPath(parent) && isSafeDocumentName(childName)) child(parent, childName) else null
+
     /** Normalizes to a leading-slash, no-trailing-slash, single-slash path. Root stays "/". */
     fun normalize(path: String): String {
         val trimmed = path.trim()

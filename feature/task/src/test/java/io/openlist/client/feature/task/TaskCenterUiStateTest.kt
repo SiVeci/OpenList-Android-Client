@@ -56,6 +56,13 @@ class TaskCenterUiStateTest {
         assertEquals(listOf(completed), groups[2].tasks)
     }
 
+    @Test
+    fun `draft retention label rounds up and never reports a negative duration`() {
+        assertEquals("草稿保留约 1分钟", formatDraftRetention(1L))
+        assertEquals("草稿保留约 1小时1分钟", formatDraftRetention(3_600_001L))
+        assertEquals("草稿即将清理", formatDraftRetention(0L))
+    }
+
     private fun task(
         id: String,
         status: UnifiedTaskStatus,
@@ -68,6 +75,7 @@ class TaskCenterUiStateTest {
             TaskSource.LOCAL_UPLOAD -> TaskType.UPLOAD
             TaskSource.LOCAL_DOWNLOAD -> TaskType.DOWNLOAD
             TaskSource.REMOTE -> TaskType.COPY
+            TaskSource.SYSTEM_DOCUMENT -> TaskType.SYSTEM_SAVE
         },
         title = id,
         status = status,

@@ -127,6 +127,7 @@ class FilesRepositoryImpl @Inject constructor(
             sign = sign,
             rawUrl = resolvedUrl,
             provider = provider,
+            hashInfo = hashInfo,
         )
     }
 

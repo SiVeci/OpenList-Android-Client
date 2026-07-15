@@ -143,7 +143,11 @@ private fun mediaPopExit(): ExitTransition =
         scaleOut(targetScale = 0.96f, animationSpec = tween(MotionFadeInMs, easing = FastOutSlowInEasing))
 
 @Composable
-fun OpenListNavHost(navController: NavHostController = rememberNavController()) {
+fun OpenListNavHost(
+    navController: NavHostController = rememberNavController(),
+    systemDocumentFailureInstanceId: String? = null,
+    onSystemDocumentFailureHandled: () -> Unit = {},
+) {
     // v1.0 S6 fix: generalizes the admin console's own session-expiry
     // redirect (see AdminHostScreen's onSessionExpired) to every screen. Keyed
     // on the *currently displayed* instanceId (from the top back-stack
@@ -159,6 +163,14 @@ fun OpenListNavHost(navController: NavHostController = rememberNavController()) 
     val mainNavigationState = resolveMainNavigationState(currentRoute)
     val currentInstanceId = currentBackStackEntry?.arguments?.getString("instanceId")
     val tabInstanceId = currentInstanceId ?: mainNavUiState.currentInstanceId
+    LaunchedEffect(systemDocumentFailureInstanceId) {
+        val instanceId = systemDocumentFailureInstanceId ?: return@LaunchedEffect
+        navController.navigate(Routes.taskCenterFailures(instanceId)) {
+            popUpTo(0)
+            launchSingleTop = true
+        }
+        onSystemDocumentFailureHandled()
+    }
     LaunchedEffect(currentInstanceId) {
         if (currentInstanceId == null) return@LaunchedEffect
         sessionExpiryViewModel.observeExpiry(currentInstanceId).collect {
@@ -264,8 +276,8 @@ fun OpenListNavHost(navController: NavHostController = rememberNavController()) 
         }
         composable(Routes.ADD_INSTANCE) {
             AddInstanceScreen(
-                onBack = { navController.popBackStack() },
-                onSaved = { navController.popBackStack() },
+                onBack = navController::leaveAddInstance,
+                onSaved = navController::navigateAfterInstanceSaved,
             )
         }
         composable(Routes.LOGIN) {
@@ -366,7 +378,9 @@ fun OpenListNavHost(navController: NavHostController = rememberNavController()) 
                 instanceId = instanceId,
                 path = path,
                 onBack = { navController.popBackStack() },
-                onOpenMediaPlayer = { mediaPath -> navController.navigate(Routes.mediaPlayer(instanceId, mediaPath)) },
+                onOpenMediaPlayer = { mediaPath ->
+                    navController.navigateFromPreviewToMediaPlayer(instanceId, mediaPath)
+                },
             )
         }
         composable(Routes.MEDIA_PLAYER) { backStackEntry ->

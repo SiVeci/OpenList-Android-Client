@@ -9,6 +9,8 @@ import io.openlist.client.core.database.dao.AdminCacheDao
 import io.openlist.client.core.database.dao.DownloadTaskDao
 import io.openlist.client.core.database.dao.FileCacheDao
 import io.openlist.client.core.database.dao.InstanceDao
+import io.openlist.client.core.database.dao.SystemDocumentDao
+import io.openlist.client.core.database.dao.SystemWriteTransactionDao
 import io.openlist.client.core.database.dao.PreviewCacheDao
 import io.openlist.client.core.database.dao.RecentPathDao
 import io.openlist.client.core.database.dao.RemoteTaskDao
@@ -34,6 +36,9 @@ class InstanceRepositoryImplTest {
     private val previewCacheDao = mockk<PreviewCacheDao>(relaxed = true)
     private val adminCacheDao = mockk<AdminCacheDao>(relaxed = true)
     private val recentPathDao = mockk<RecentPathDao>(relaxed = true)
+    private val systemDocumentDao = mockk<SystemDocumentDao>(relaxed = true)
+    private val systemWriteTransactionDao = mockk<SystemWriteTransactionDao>(relaxed = true)
+    private val systemDocumentSpaceManager = mockk<SystemDocumentSpaceManager>(relaxed = true)
     private val clientFactory = mockk<OpenListClientFactory>(relaxed = true)
     private val context = mockk<Context>()
 
@@ -42,6 +47,7 @@ class InstanceRepositoryImplTest {
         val cacheDir = Files.createTempDirectory("openlist-instance-delete").toFile()
         every { context.cacheDir } returns cacheDir
         coEvery { recentPathDao.deleteByInstanceId(INSTANCE_ID) } returns Unit
+        coEvery { systemWriteTransactionDao.getAllByInstance(INSTANCE_ID) } returns emptyList()
         val repository = InstanceRepositoryImpl(
             dao = instanceDao,
             sessionDao = sessionDao,
@@ -54,6 +60,9 @@ class InstanceRepositoryImplTest {
             previewCacheDao = previewCacheDao,
             adminCacheDao = adminCacheDao,
             recentPathDao = recentPathDao,
+            systemDocumentDao = systemDocumentDao,
+            systemWriteTransactionDao = systemWriteTransactionDao,
+            systemDocumentSpaceManager = systemDocumentSpaceManager,
             clientFactory = clientFactory,
             context = context,
         )
@@ -61,6 +70,8 @@ class InstanceRepositoryImplTest {
         repository.delete(INSTANCE_ID)
 
         coVerify(exactly = 1) { recentPathDao.deleteByInstanceId(INSTANCE_ID) }
+        coVerify(exactly = 1) { systemWriteTransactionDao.deleteByInstanceId(INSTANCE_ID) }
+        coVerify(exactly = 1) { systemDocumentDao.deleteByInstanceId(INSTANCE_ID) }
         coVerify(exactly = 1) { instanceDao.deleteById(INSTANCE_ID) }
     }
 

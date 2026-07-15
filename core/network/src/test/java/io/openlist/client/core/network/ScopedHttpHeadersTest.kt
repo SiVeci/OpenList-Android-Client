@@ -78,16 +78,13 @@ class ScopedHttpHeadersTest {
     }
 
     @Test
-    fun `same host different port is still considered matching since host comparison ignores port`() {
-        // HttpUrl#host deliberately excludes the port -- this documents that
-        // choice rather than asserting a stricter host+port match, matching
-        // this function's kdoc ("host is byte-for-byte identical").
+    fun `same host different port attaches nothing`() {
         val headers = buildScopedHttpHeaders(
             requestUrl = "https://openlist.example.com:8080/d/movie.mp4",
             instanceBaseUrl = "https://openlist.example.com:9000",
             token = "token-123",
         )
 
-        assertEquals(mapOf("Authorization" to "token-123"), headers)
+        assertTrue(headers.isEmpty())
     }
 }

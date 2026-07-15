@@ -5,6 +5,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Box
@@ -51,6 +53,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,9 +71,14 @@ import io.openlist.client.core.designsystem.components.ErrorBar
 import io.openlist.client.core.designsystem.components.OfflineDownloadSheet
 import io.openlist.client.core.designsystem.components.TaskTabRow
 import io.openlist.client.core.model.TaskType
+import io.openlist.client.core.model.TaskSource
 import io.openlist.client.core.model.UnifiedTask
 import io.openlist.client.core.model.UnifiedTaskStatus
+import io.openlist.client.core.model.SystemDocumentRecoveryAction
 import io.openlist.client.core.network.OpenListPathCodec
+import kotlinx.coroutines.delay
+
+private const val DRAFT_RETENTION_REFRESH_MS = 60_000L
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,6 +91,13 @@ fun TaskCenterScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val exportDraftLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream"),
+    ) { uri -> viewModel.completeDraftExport(uri?.toString()) }
+
+    LaunchedEffect(uiState.exportDraftTask?.id) {
+        uiState.exportDraftTask?.let { exportDraftLauncher.launch(it.title.substringAfter(": ", it.title)) }
+    }
 
     // P9's other half: refreshes local download status the moment
     // DownloadManager finishes one, on top of the 4s remote poll — registered
@@ -185,6 +200,8 @@ fun TaskCenterScreen(
                                         task = task,
                                         onCancel = { viewModel.openCancelConfirm(task) },
                                         onRetry = { viewModel.retryTask(task) },
+                                        onExportDraft = { viewModel.requestDraftExport(task) },
+                                        onDeleteDraft = { viewModel.openDeleteDraftConfirm(task) },
                                         onOpenTarget = { viewModel.openTaskTarget(task, onOpenDirectory, onOpenFile) },
                                     )
                                 }
@@ -205,6 +222,18 @@ fun TaskCenterScreen(
             confirmText = "取消任务",
             danger = true,
             loading = uiState.cancelling,
+        )
+    }
+
+    uiState.deleteDraftConfirmTask?.let { task ->
+        ConfirmDialog(
+            title = "删除草稿",
+            message = "删除后无法恢复“${task.title}”的本地草稿。",
+            onConfirm = viewModel::confirmDeleteDraft,
+            onDismiss = viewModel::dismissDeleteDraftConfirm,
+            confirmText = "删除草稿",
+            danger = true,
+            loading = uiState.deletingDraft,
         )
     }
 
@@ -344,6 +373,8 @@ private fun TaskRow(
     task: UnifiedTask,
     onCancel: () -> Unit,
     onRetry: () -> Unit,
+    onExportDraft: () -> Unit,
+    onDeleteDraft: () -> Unit,
     onOpenTarget: () -> Unit,
 ) {
     // v1.0: local downloads can now be cancelled too (v1.0_PRD §4.2.C.2) —
@@ -352,7 +383,10 @@ private fun TaskRow(
     val canCancel = task.status == UnifiedTaskStatus.RUNNING || task.status == UnifiedTaskStatus.PENDING
     // v1.0_PRD §4.2.C.1: only local uploads support retry.
     val canRetry = task.status == UnifiedTaskStatus.FAILED &&
-        task.source == io.openlist.client.core.model.TaskSource.LOCAL_UPLOAD
+        (task.source == io.openlist.client.core.model.TaskSource.LOCAL_UPLOAD ||
+            SystemDocumentRecoveryAction.RETRY_SAVE in task.recoveryActions)
+    val canExportDraft = SystemDocumentRecoveryAction.EXPORT_COPY in task.recoveryActions
+    val canDeleteDraft = SystemDocumentRecoveryAction.DELETE_DRAFT in task.recoveryActions
     // Unchanged condition (S6-T4 DoD: "canOpenFolder"'s own gating logic is
     // not touched, only what a click on it does) -- still gates on
     // SUCCESS+non-null path; the icon's name/"跳转目录" label stays even
@@ -384,7 +418,10 @@ private fun TaskRow(
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                task.path?.let { path ->
+                if (task.source == TaskSource.SYSTEM_DOCUMENT) {
+                    SystemDraftContext(task)
+                }
+                task.path?.takeIf { task.source != TaskSource.SYSTEM_DOCUMENT }?.let { path ->
                     Text(
                         text = path,
                         style = MaterialTheme.typography.bodyMedium,
@@ -415,8 +452,49 @@ private fun TaskRow(
                 onOpenTarget = onOpenTarget,
                 onRetry = onRetry,
                 onCancel = onCancel,
+                canExportDraft = canExportDraft,
+                canDeleteDraft = canDeleteDraft,
+                onExportDraft = onExportDraft,
+                onDeleteDraft = onDeleteDraft,
             )
         }
+    }
+}
+
+@Composable
+private fun SystemDraftContext(task: UnifiedTask) {
+    val remainingMillis by produceState(
+        initialValue = task.expiresAt?.minus(System.currentTimeMillis()),
+        key1 = task.expiresAt,
+    ) {
+        while (true) {
+            value = task.expiresAt?.minus(System.currentTimeMillis())
+            delay(DRAFT_RETENTION_REFRESH_MS)
+        }
+    }
+    val context = buildList {
+        task.instanceName?.takeIf { it.isNotBlank() }?.let { add("实例：$it") }
+        task.directorySummary?.takeIf { it.isNotBlank() }?.let { add("目录：$it") }
+        remainingMillis?.let { add(formatDraftRetention(it)) }
+    }.joinToString(" · ")
+    if (context.isNotBlank()) {
+        Text(
+            text = context,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+internal fun formatDraftRetention(remainingMillis: Long): String {
+    if (remainingMillis <= 0) return "草稿即将清理"
+    val totalMinutes = (remainingMillis + 59_999L) / 60_000L
+    val hours = totalMinutes / 60L
+    val minutes = totalMinutes % 60L
+    return when {
+        hours > 0 && minutes > 0 -> "草稿保留约 ${hours}小时${minutes}分钟"
+        hours > 0 -> "草稿保留约 ${hours}小时"
+        else -> "草稿保留约 ${minutes.coerceAtLeast(1)}分钟"
     }
 }
 
@@ -449,9 +527,13 @@ private fun TaskStatusAndActions(
     canOpenFolder: Boolean,
     canRetry: Boolean,
     canCancel: Boolean,
+    canExportDraft: Boolean,
+    canDeleteDraft: Boolean,
     onOpenTarget: () -> Unit,
     onRetry: () -> Unit,
     onCancel: () -> Unit,
+    onExportDraft: () -> Unit,
+    onDeleteDraft: () -> Unit,
 ) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
@@ -471,6 +553,12 @@ private fun TaskStatusAndActions(
             OutlinedButton(onClick = onRetry) {
                 Text("重试")
             }
+        }
+        if (canExportDraft) {
+            OutlinedButton(onClick = onExportDraft) { Text("恢复副本") }
+        }
+        if (canDeleteDraft) {
+            OutlinedButton(onClick = onDeleteDraft) { Text("删除草稿") }
         }
         if (canCancel) {
             IconButton(onClick = onCancel) {
@@ -508,5 +596,5 @@ private fun TaskType.toIcon(): ImageVector = when (this) {
     TaskType.OFFLINE_DOWNLOAD -> Icons.Filled.CloudDownload
     TaskType.COPY -> Icons.Filled.FileCopy
     TaskType.MOVE -> Icons.AutoMirrored.Filled.DriveFileMove
-    TaskType.INDEX, TaskType.EXTRACT, TaskType.UNKNOWN -> Icons.Filled.Task
+    TaskType.INDEX, TaskType.EXTRACT, TaskType.SYSTEM_SAVE, TaskType.UNKNOWN -> Icons.Filled.Task
 }

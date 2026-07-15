@@ -8,6 +8,8 @@ import io.openlist.client.core.database.dao.AdminCacheDao
 import io.openlist.client.core.database.dao.DownloadTaskDao
 import io.openlist.client.core.database.dao.FileCacheDao
 import io.openlist.client.core.database.dao.InstanceDao
+import io.openlist.client.core.database.dao.SystemDocumentDao
+import io.openlist.client.core.database.dao.SystemWriteTransactionDao
 import io.openlist.client.core.database.dao.PreviewCacheDao
 import io.openlist.client.core.database.dao.RecentPathDao
 import io.openlist.client.core.database.dao.RemoteTaskDao
@@ -41,6 +43,9 @@ class InstanceRepositoryImpl @Inject constructor(
     private val previewCacheDao: PreviewCacheDao,
     private val adminCacheDao: AdminCacheDao,
     private val recentPathDao: RecentPathDao,
+    private val systemDocumentDao: SystemDocumentDao,
+    private val systemWriteTransactionDao: SystemWriteTransactionDao,
+    private val systemDocumentSpaceManager: SystemDocumentSpaceManager,
     private val clientFactory: OpenListClientFactory,
     @ApplicationContext private val context: Context,
 ) : InstanceRepository {
@@ -100,6 +105,16 @@ class InstanceRepositoryImpl @Inject constructor(
         recentPathDao.deleteByInstanceId(id)
         // v0.5 admin console cache (PRD §11.6/§17.2.8: "删除实例时清理管理缓存").
         adminCacheDao.deleteByInstanceId(id)
+        // System-document UUID mappings and private draft journals are scoped
+        // to one instance.  Do not try to delete remote stage/backup files here:
+        // after the instance credential is removed their ownership cannot be
+        // safely re-established, so this operation remains local-only.
+        systemWriteTransactionDao.getAllByInstance(id).forEach { transaction ->
+            systemDocumentSpaceManager.deleteDraftFile(transaction.transactionId)
+            systemDocumentSpaceManager.releaseDraftReservation(transaction.transactionId)
+        }
+        systemWriteTransactionDao.deleteByInstanceId(id)
+        systemDocumentDao.deleteByInstanceId(id)
         // Preview content bodies live under cacheDir/preview/<instanceId>/, not
         // in any DAO-owned table (P-415), so the on-disk cache is cleaned up
         // directly here too — best-effort, matching the rest of this method's

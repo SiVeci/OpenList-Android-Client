@@ -13,8 +13,8 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
  * it to hosts that never should have seen it.
  *
  * [buildScopedHttpHeaders] is the single choke point that decides whether the
- * token is safe to attach: only when [requestUrl]'s host is byte-for-byte
- * identical to [instanceBaseUrl]'s host. Any mismatch (different host,
+ * token is safe to attach: only when [requestUrl]'s scheme, host and port
+ * are byte-for-byte identical to [instanceBaseUrl]'s origin. Any mismatch (different origin,
  * unparsable url, or a null/blank token) yields an empty map — "don't attach
  * anything" is always the safe default.
  *
@@ -28,10 +28,10 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 fun buildScopedHttpHeaders(requestUrl: String, instanceBaseUrl: String, token: String?): Map<String, String> {
     if (token.isNullOrBlank()) return emptyMap()
 
-    val requestHost = requestUrl.toHttpUrlOrNull()?.host ?: return emptyMap()
-    val instanceHost = instanceBaseUrl.toHttpUrlOrNull()?.host ?: return emptyMap()
+    val request = requestUrl.toHttpUrlOrNull() ?: return emptyMap()
+    val instance = instanceBaseUrl.toHttpUrlOrNull() ?: return emptyMap()
 
-    return if (requestHost == instanceHost) {
+    return if (request.scheme == instance.scheme && request.host == instance.host && request.port == instance.port) {
         mapOf("Authorization" to token)
     } else {
         emptyMap()

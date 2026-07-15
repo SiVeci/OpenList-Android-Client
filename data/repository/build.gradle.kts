@@ -50,5 +50,6 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
+    testImplementation(libs.squareup.mockwebserver)
     testImplementation(libs.kotlinx.coroutines.test)
 }

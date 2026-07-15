@@ -12,9 +12,11 @@ import io.openlist.client.core.domain.DirectoryPickerRepository
 import io.openlist.client.core.domain.FilesRepository
 import io.openlist.client.core.domain.OfflineDownloadRepository
 import io.openlist.client.core.domain.TaskAggregationRepository
+import io.openlist.client.core.domain.SystemDocumentsRepository
 import io.openlist.client.core.model.TaskSource
 import io.openlist.client.core.model.UnifiedTask
 import io.openlist.client.core.model.UnifiedTaskStatus
+import io.openlist.client.core.model.SystemDocumentRecoveryAction
 import io.openlist.client.core.network.OpenListPathCodec
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -78,6 +80,10 @@ data class TaskCenterUiState(
     val groupActionConfirm: TaskGroupActionConfirm? = null,
     val groupActionLoading: Boolean = false,
     val offlineDownload: OfflineDownloadUiState? = null,
+    val exportDraftTask: UnifiedTask? = null,
+    val exportingDraft: Boolean = false,
+    val deleteDraftConfirmTask: UnifiedTask? = null,
+    val deletingDraft: Boolean = false,
     val snackbarMessage: String? = null,
 ) {
     val summary: TaskSummary
@@ -124,11 +130,14 @@ class TaskCenterViewModel @Inject constructor(
     private val offlineDownloadRepository: OfflineDownloadRepository,
     private val directoryPickerRepository: DirectoryPickerRepository,
     private val filesRepository: FilesRepository,
+    private val systemDocumentsRepository: SystemDocumentsRepository,
 ) : ViewModel() {
 
     private val instanceId: String = checkNotNull(savedStateHandle["instanceId"])
 
-    private val _uiState = MutableStateFlow(TaskCenterUiState())
+    private val _uiState = MutableStateFlow(
+        TaskCenterUiState(selectedTab = savedStateHandle.get<String>("tab").toTaskTabOrDefault()),
+    )
     val uiState: StateFlow<TaskCenterUiState> = _uiState.asStateFlow()
 
     init {
@@ -266,6 +275,54 @@ class TaskCenterViewModel @Inject constructor(
             when (val result = taskAggregationRepository.retryTask(instanceId, task.id, task.source)) {
                 is ApiResult.Success -> _uiState.update { it.copy(snackbarMessage = "已重新开始上传") }
                 is ApiResult.Failure -> _uiState.update { it.copy(snackbarMessage = result.error.toUserMessage()) }
+            }
+        }
+    }
+
+    fun requestDraftExport(task: UnifiedTask) {
+        if (SystemDocumentRecoveryAction.EXPORT_COPY !in task.recoveryActions) return
+        _uiState.update { it.copy(exportDraftTask = task, snackbarMessage = null) }
+    }
+
+    fun completeDraftExport(destinationUri: String?) {
+        val task = _uiState.value.exportDraftTask ?: return
+        if (destinationUri == null) {
+            _uiState.update { it.copy(exportDraftTask = null, snackbarMessage = "已取消恢复副本，草稿仍保留") }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(exportingDraft = true) }
+            when (val result = systemDocumentsRepository.exportDraft(task.id, destinationUri)) {
+                is ApiResult.Success -> _uiState.update {
+                    it.copy(exportDraftTask = null, exportingDraft = false, snackbarMessage = "已恢复副本并清除草稿")
+                }
+                is ApiResult.Failure -> _uiState.update {
+                    it.copy(exportDraftTask = null, exportingDraft = false, snackbarMessage = result.error.toUserMessage())
+                }
+            }
+        }
+    }
+
+    fun openDeleteDraftConfirm(task: UnifiedTask) {
+        if (SystemDocumentRecoveryAction.DELETE_DRAFT !in task.recoveryActions) return
+        _uiState.update { it.copy(deleteDraftConfirmTask = task) }
+    }
+
+    fun dismissDeleteDraftConfirm() {
+        if (!_uiState.value.deletingDraft) _uiState.update { it.copy(deleteDraftConfirmTask = null) }
+    }
+
+    fun confirmDeleteDraft() {
+        val task = _uiState.value.deleteDraftConfirmTask ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(deletingDraft = true) }
+            when (val result = systemDocumentsRepository.deleteDraft(task.id)) {
+                is ApiResult.Success -> _uiState.update {
+                    it.copy(deleteDraftConfirmTask = null, deletingDraft = false, snackbarMessage = "草稿已删除")
+                }
+                is ApiResult.Failure -> _uiState.update {
+                    it.copy(deleteDraftConfirmTask = null, deletingDraft = false, snackbarMessage = result.error.toUserMessage())
+                }
             }
         }
     }
@@ -411,6 +468,9 @@ private fun TaskTab.sourceOrNull(): TaskSource? = when (this) {
     TaskTab.REMOTE -> TaskSource.REMOTE
     TaskTab.FAILED -> null
 }
+
+private fun String?.toTaskTabOrDefault(): TaskTab =
+    TaskTab.entries.firstOrNull { it.name.equals(this, ignoreCase = true) } ?: TaskTab.UPLOAD
 
 private fun TaskGroupActionConfirm.successMessage(): String = when (type) {
     TaskGroupActionType.CANCEL_ACTIVE -> "已取消 $count 个任务"

@@ -2,8 +2,10 @@ package io.openlist.client.core.network
 
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -12,6 +14,18 @@ import org.junit.Test
  * and in v0.1_EXECUTION_PLAN.md §11 (Sprint 6 stabilization).
  */
 class OpenListPathCodecTest {
+
+    @Test
+    fun `provider safe path helpers reject traversal separators and encoded separators`() {
+        assertTrue(OpenListPathCodec.isSafeDocumentName("报告.txt"))
+        assertFalse(OpenListPathCodec.isSafeDocumentName("../secret"))
+        assertFalse(OpenListPathCodec.isSafeDocumentName("a%2Fb"))
+        assertFalse(OpenListPathCodec.isSafeDocumentName("a\\b"))
+        assertEquals("/safe/name.txt", OpenListPathCodec.safeChild("/safe", "name.txt"))
+        assertNull(OpenListPathCodec.safeChild("/safe", "../name.txt"))
+        assertTrue(OpenListPathCodec.isWithin("/safe", "/safe/child"))
+        assertFalse(OpenListPathCodec.isWithin("/safe", "/safe-other"))
+    }
 
     @Test
     fun `normalize collapses root variants`() {

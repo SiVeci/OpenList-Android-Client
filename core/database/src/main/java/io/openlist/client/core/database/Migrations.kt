@@ -193,3 +193,70 @@ val MIGRATION_9_10 = object : Migration(9, 10) {
         )
     }
 }
+
+/**
+ * v1.4 DocumentsProvider mapping and write journal. This migration only adds
+ * tables and indices; existing instance/session/cache/task data is untouched.
+ */
+val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `system_documents` (" +
+                "`documentId` TEXT NOT NULL, " +
+                "`instanceId` TEXT NOT NULL, " +
+                "`parentDocumentId` TEXT, " +
+                "`currentPath` TEXT, " +
+                "`lastKnownPath` TEXT NOT NULL, " +
+                "`displayName` TEXT NOT NULL, " +
+                "`isDirectory` INTEGER NOT NULL, " +
+                "`mimeType` TEXT NOT NULL, " +
+                "`sizeBytes` INTEGER, " +
+                "`modifiedAt` INTEGER, " +
+                "`hashInfo` TEXT, " +
+                "`provider` TEXT, " +
+                "`lifecycle` TEXT NOT NULL, " +
+                "`unsupportedCapabilitiesMask` INTEGER NOT NULL, " +
+                "`capabilityUpdatedAt` INTEGER, " +
+                "`lastSeenAt` INTEGER NOT NULL, " +
+                "`updatedAt` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`documentId`))",
+        )
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_system_documents_instanceId_currentPath` ON `system_documents` (`instanceId`, `currentPath`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_system_documents_instanceId_parentDocumentId_lifecycle` ON `system_documents` (`instanceId`, `parentDocumentId`, `lifecycle`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_system_documents_instanceId_lastKnownPath` ON `system_documents` (`instanceId`, `lastKnownPath`)")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `system_write_transactions` (" +
+                "`transactionId` TEXT NOT NULL, " +
+                "`instanceId` TEXT NOT NULL, " +
+                "`documentId` TEXT, " +
+                "`targetPath` TEXT NOT NULL, " +
+                "`displayName` TEXT NOT NULL, " +
+                "`localRelativePath` TEXT NOT NULL, " +
+                "`remoteTempPath` TEXT, " +
+                "`remoteBackupPath` TEXT, " +
+                "`remoteStageName` TEXT, " +
+                "`remoteBackupName` TEXT, " +
+                "`state` TEXT NOT NULL, " +
+                "`dirtyGeneration` INTEGER NOT NULL, " +
+                "`committedGeneration` INTEGER NOT NULL, " +
+                "`reservedBytes` INTEGER NOT NULL, " +
+                "`expectedSize` INTEGER, " +
+                "`expectedHash` TEXT, " +
+                "`baseFingerprint` TEXT, " +
+                "`failureStage` TEXT, " +
+                "`errorCode` TEXT, " +
+                "`errorMessage` TEXT, " +
+                "`attemptCount` INTEGER NOT NULL, " +
+                "`lastAttemptAt` INTEGER, " +
+                "`cleanupAfter` INTEGER, " +
+                "`expiresAt` INTEGER, " +
+                "`createdAt` INTEGER NOT NULL, " +
+                "`updatedAt` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`transactionId`))",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_system_write_transactions_instanceId_state_updatedAt` ON `system_write_transactions` (`instanceId`, `state`, `updatedAt`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_system_write_transactions_instanceId_documentId_state` ON `system_write_transactions` (`instanceId`, `documentId`, `state`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_system_write_transactions_expiresAt_state` ON `system_write_transactions` (`expiresAt`, `state`)")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_system_write_transactions_localRelativePath` ON `system_write_transactions` (`localRelativePath`)")
+    }
+}

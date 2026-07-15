@@ -2,11 +2,11 @@ package io.openlist.client.core.model
 
 /** Where a `UnifiedTask` originates (v0.3_EXECUTION_PLAN.md §11, task center Tab
  * = "全部/上传/下载/远程" per source). */
-enum class TaskSource { LOCAL_UPLOAD, LOCAL_DOWNLOAD, REMOTE }
+enum class TaskSource { LOCAL_UPLOAD, LOCAL_DOWNLOAD, REMOTE, SYSTEM_DOCUMENT }
 
 /** Kept 1:1 with the 7 backend task-type path segments plus the 2 local
  * transfer kinds; v0.3 only polls 4 remote types (P7). */
-enum class TaskType { UPLOAD, DOWNLOAD, OFFLINE_DOWNLOAD, COPY, MOVE, INDEX, EXTRACT, UNKNOWN }
+enum class TaskType { UPLOAD, DOWNLOAD, OFFLINE_DOWNLOAD, COPY, MOVE, INDEX, EXTRACT, SYSTEM_SAVE, UNKNOWN }
 
 /** Normalizes local (`UploadTaskStatus`/`DownloadTaskEntity.status`) and
  * remote (`tache.State` via `TaskStateMapper`) statuses into one enum so the
@@ -33,4 +33,11 @@ data class UnifiedTask(
     val errorMessage: String?,
     val createdAt: Long,
     val updatedAt: Long,
+    /** v1.4-only metadata; regular transfer rows deliberately leave these null/empty. */
+    val expiresAt: Long? = null,
+    val recoveryActions: Set<SystemDocumentRecoveryAction> = emptySet(),
+    /** Human-readable context for a retained system-document draft; never a credential or URI. */
+    val instanceName: String? = null,
+    /** A compact directory label rather than the complete remote path. */
+    val directorySummary: String? = null,
 )

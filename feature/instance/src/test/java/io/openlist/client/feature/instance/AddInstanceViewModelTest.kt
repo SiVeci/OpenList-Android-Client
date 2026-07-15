@@ -64,6 +64,20 @@ class AddInstanceViewModelTest {
         assertNull(state.testElapsedMillis)
     }
 
+    @Test
+    fun `save publishes the created instance id for navigation`() = runTest {
+        val viewModel = AddInstanceViewModel(FakeInstanceRepository())
+
+        viewModel.onUrlChange("https://example.com")
+        viewModel.save()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("instance-1", state.savedInstanceId)
+        assertEquals(false, state.isSaving)
+        assertNull(state.saveError)
+    }
+
     private class FakeInstanceRepository : InstanceRepository {
         val testedBaseUrls = mutableListOf<String>()
         private val instances = MutableStateFlow(emptyList<Instance>())

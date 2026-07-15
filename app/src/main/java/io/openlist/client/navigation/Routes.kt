@@ -21,7 +21,7 @@ object Routes {
      * happened to enter from — same instance-agnostic pattern as [SETTINGS]. */
     const val SHARE_OPEN = "share_open"
     const val SEARCH = "search/{instanceId}?path={path}"
-    const val TASK_CENTER = "task_center/{instanceId}"
+    const val TASK_CENTER = "task_center/{instanceId}?tab={tab}"
     const val PREVIEW = "preview/{instanceId}?path={path}"
     const val MEDIA_PLAYER = "player/{instanceId}?path={path}"
     /** Single sprint-wide host route for the whole admin console (v0.5_EXECUTION_PLAN.md
@@ -37,7 +37,10 @@ object Routes {
     fun shareList(instanceId: String) = "share_list/$instanceId"
     fun shareDetail(instanceId: String, shareId: String) = "share_detail/$instanceId/$shareId"
     fun search(instanceId: String, path: String = "/") = "search/$instanceId?path=${encodePathArg(path)}"
-    fun taskCenter(instanceId: String) = "task_center/$instanceId"
+    fun taskCenter(instanceId: String, tab: String? = null) =
+        "task_center/$instanceId" + (tab?.let { "?tab=$it" } ?: "")
+
+    fun taskCenterFailures(instanceId: String) = taskCenter(instanceId, tab = "failed")
     fun preview(instanceId: String, path: String) = "preview/$instanceId?path=${encodePathArg(path)}"
     fun mediaPlayer(instanceId: String, path: String) = "player/$instanceId?path=${encodePathArg(path)}"
     fun admin(instanceId: String, tab: String? = null) =
